@@ -28,6 +28,5 @@ VideoGame (3 people)
        - updates the viewer (provided)
        - reads either keyboard or joystick
        - sends the <UDP> packet of the control to the server
-    
-    Login
-    
+	
+     Login
