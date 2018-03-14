@@ -1,4 +1,4 @@
-# ProgettoSO-VideoGame-
+# ProgettoSO-VideoGame
 Progetto di Sistemi Operativi (VideoGame)
 
 VideoGame (3 people)
