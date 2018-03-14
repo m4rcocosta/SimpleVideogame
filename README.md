@@ -1,6 +1,4 @@
 # ProgettoSO-VideoGame
-Progetto di Sistemi Operativi (VideoGame)
-
 VideoGame (3 people)
    - implement a distributed videogame
      Server Side:
