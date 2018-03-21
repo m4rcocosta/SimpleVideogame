@@ -1,33 +1,14 @@
 # ProgettoSO-VideoGame
-VideoGame (3 people)
-   - implement a distributed videogame
-     Server Side:
-     - the server operates in both TCP and UDP
-       TCP Part
-       - registerning a new client when it comes online
-       - deregistering a client when it goes offline
-       - sending the map, when the client requests it
-     - UDP part
-       - the server receives preiodic upates from the client
-         in the form of
-	 <timestamp, translational acceleration, rotational acceleration>
-	 Each "epoch" it integrates the messages from the clients,
-	 and sends back a state update
-       - the server sends to each connected client
-         the position of the agents around him
+Progetto di Sistemi Operativi (VideoGame)
 
-     Client side:
-     - the client does the following
-     - connects to the server (TCP)
-     - requests the map, and gets an ID from the server (TCP)
-     - receives udates on the state from the server
+## Developers
+* *[Marco Costa]*(https://github.com/marco-96)
+* *[Andrea Antonini]*(https://github.com/AndreaAntonini)
+* *Lorenzo Fioravanti*
 
-     - periodically
-       - updates the viewer (provided)
-       - reads either keyboard or joystick
-       - sends the <UDP> packet of the control to the server
-     
-     Login:
-     - At the first connection, ask the user to choose a username and password
-     - When disconnected, the user status (position in the world, textures etc.) is saved on the server
-     - The next time the same user connects, his status is restored
+## Written in
+* C
+
+## Documentation
+* [DOCUMENTATION.md](DOCUMENTATION.md)
+
