@@ -16,7 +16,7 @@ VideoGame (3 people)
        - the server sends to each connected client
          the position of the agents around him
 
-     Client side
+     Client side:
      - the client does the following
      - connects to the server (TCP)
      - requests the map, and gets an ID from the server (TCP)
@@ -27,7 +27,7 @@ VideoGame (3 people)
        - reads either keyboard or joystick
        - sends the <UDP> packet of the control to the server
      
-     Login
+     Login:
      - At the first connection, ask the user to choose a username and password
      - When disconnected, the user status (position in the world, textures etc.) is saved on the server
      - The next time the same user connects, his status is restored
