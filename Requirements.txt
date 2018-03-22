@@ -1,4 +1,3 @@
-# ProgettoSO-VideoGame
 VideoGame (3 people)
    - implement a distributed videogame
      Server Side:
