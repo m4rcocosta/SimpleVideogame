@@ -1,40 +1,19 @@
-#include "image.h"
-#include <errno.h>
+typedef struct client_connected{
+	int id;
+	Image* texture;
+	sockaddr_in* addr; //to send data over udp socket to the client
+	int socket_TCP  //to send data over tcp to the client(la socket ricevuta dalla accept)
+}client_connected;
 
+typedef struct thread_server_tcp_args{
+    int socket_desc_tcp_client;
+    client_connected* connected;
+    client_disconnected* disconnected;
+}thread_server_tcp_args;
 
-#define SERVER_IP 	"127.0.0.1"
-#define SERVER_PORT 8080
-#define ACTIVE			8
-#define BUFFERSIZE	1000000
-
-//USED FOR DEBUG
-#define SERVER	"[SERVER] "
-#define CLIENT  "[CLIENT] "
-#define TCP		"[TCP] "
-#define UDP		"[UDP] "
-
-#define DEBUG	1
-
-
-
-#define GENERIC_ERROR_HELPER(cond, errCode, msg) do {               \
-        if (cond) {                                                 \
-            fprintf(stderr, "%s: %s\n", msg, strerror(errCode));    \
-            exit(EXIT_FAILURE);                                     \
-        }                                                           \
-    } while(0)
-
-
-#define ERROR_HELPER(ret, msg)          GENERIC_ERROR_HELPER((ret < 0), errno, msg)
-#define PTHREAD_ERROR_HELPER(ret, msg)  GENERIC_ERROR_HELPER((ret != 0), ret, msg)
-
-
-struct args{ //USED BY A THREAD IN SERVER
-	Image * surface_texture;
-	Image * elevation_texture;
-	Image * vehicle_texture;
-	int tcp_socket;
-	int udp_socket;
-	int idx;
-};
+typedef struct thread_server_udp_args{
+    int socket_desc_udp_server;
+    client_connected* connected;
+    client_disconnected* disconnected;
+}thread_server_udp_args;
 
