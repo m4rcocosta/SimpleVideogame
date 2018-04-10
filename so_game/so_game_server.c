@@ -10,6 +10,8 @@
 #include "world.h"
 #include "vehicle.h"
 #include "world_viewer.h"
+#include "utils.h"
+#include "common.h"
 
 int main(int argc, char **argv) {
   if (argc<4) {
@@ -18,7 +20,7 @@ int main(int argc, char **argv) {
   }
   char* elevation_filename=argv[1];
   char* texture_filename=argv[2];
-  long tmp = strtol(argv[3], NULL, 0);
+  long tmp = strtol(argv[3], NULL, 0);		//tcp_port
   if (tmp < 1024 || tmp > 49151) {
 	fprintf(stderr, "Use a port number between 1024 and 49151.\n");
 	exit(EXIT_FAILURE);
@@ -52,7 +54,7 @@ int main(int argc, char **argv) {
   }
   
   int ret, socket_tcp, socket_udp;			//network variables
-  struct sockaddr_in server_addr{0};
+  struct sockaddr_in server_addr_tcp{0};
   
   if(DEBUG) printf("%s... initializing TCP\n", SERVER);
   if(DEBUG) printf("%s...Socket creation\n", SERVER);
@@ -61,9 +63,9 @@ int main(int argc, char **argv) {
   socket_tcp = socket(AF_INET, SOCK_STREAM, 0);
   ERROR_HELPER(socket_tcp, "Error in socket creation\n");
   
-  server_addr.sin_family			= AF_INET;
-  server_addr.sin_port				= htons(SERVER_PORT);
-  server_addr.sin_addr.s_addr	= INADDR_ANY;
+  server_addr_tcp.sin_family			= AF_INET;
+  server_addr_tcp.sin_port				= htons(tmp);
+  server_addr_tcp.sin_addr.s_addr	= INADDR_ANY;
   
   int reuseaddr_opt = 1;		//recover a server in case of a crash
   ret = setsockopt(server_tcp, SOL_SOCKET, SO_REUSEADDR, &reuseaddr_opt, sizeof(reuseaddr_opt));
@@ -73,8 +75,37 @@ int main(int argc, char **argv) {
   ret = bind(socket_tcp, (struct sockaddr*) &server_addr, sizeof(server_addr);
   ERROR_HELPER(ret, "Error in binding\n");
   
+  //listen to a max of 8 connections
+  ret = listen(socket_tcp, 8);
+  ERROR_HELPER(ret, "Error in listen\n");
   
+  if(DEBUG) printf("%s... initializing UDP\n", SERVER);
+  if(DEBUG) printf("%s... socket creation\n", SERVER);
   
+  //UDP socket
+  socket_udp = socket(AF_INET, SOCK_DGRAM, 0);
+  ERROR_HELPER(socket_udp, "Error in socket_udp creation\n");
+  
+  struct sockaddr_in server_addr_udp {0};
+  server_addr_udp.sin_family			= AF_INET;
+  server_addr_udp.sin_port				= htons(UDP_PORT);
+  server_addr_udp.sin_addr.s_addr	= INADDR_ANY;
+  
+  int reuseaddr_opt_udp = 1;		//recover a server in case of a crash
+  ret = setsockopt(socket_udp, SOL_SOCKET, SO_REUSEADDR, &reuseaddr_opt_udp, sizeof(reuseaddr_opt_udp));
+  ERROR_HELPER(ret, "Failed setsockopt() on server socket_tcp");
+  
+  //bind udp
+  ret = bind(socket_udp, (struct sockaddr*) &server_addr_udp, sizeof(server_addr_udp));
+  ERROR_HELPER(ret, "Error in udp binding\n");
+  
+  if(DEBUG) printf("%s... UDP socket created\n", SERVER);
+  
+  if(DEBUG) printf("%s... creating threads for managing communications\n");
+  
+  thread_server_UDP_args* udp_args = (thread_server_udp_args*)malloc(sizeof(thread_server_udp_args));
+  udp_args->socket_desc_udp_server = socket_udp;
+  udp_args->connected ////////////
 
   // not needed here
   //   // construct the world
