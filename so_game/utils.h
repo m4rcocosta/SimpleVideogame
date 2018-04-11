@@ -17,3 +17,15 @@ typedef struct thread_server_udp_args{
     client_disconnected* disconnected;
 }thread_server_udp_args;
 
+typedef struct playerWorld{
+    int id_list[WORLDSIZE];
+    int players_online;
+    Vehicle** vehicles;
+}localWorld;
+
+typedef struct udpArgs{
+    localWorld* lw;
+    struct sockaddr_in server_addr;
+    int socket_udp;
+    int socket_tcp;
+}udpArgs;
