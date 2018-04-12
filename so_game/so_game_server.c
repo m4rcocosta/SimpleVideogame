@@ -20,9 +20,8 @@
 #include "clientList.h"
 #include "so_game_protocol.h"
 
-int connect = 1, update = 1;
+int accept = 1, update = 0, communicate = 1;
 ClientList* users;
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 sem_t* sem_user;
 int socket_tcp, socket_udp;		//network variables
 World world;
@@ -33,8 +32,9 @@ void handler(int signal){
 		case SIGHUP:
 			break;
 		case SIGINT:
-			connect = 0;
-			update = 0;
+			if(communicate) communicate = 0;
+			if(update) update = 0;
+			printf("%s...Closing server after a %s signal...\n", SERVER, signal);
 			break;
 		default:
             fprintf(stderr, "Caught wrong signal: %d\n", signal);
@@ -69,20 +69,68 @@ int udp_handler(int socket_udp,char* buf_rcv,struct sockaddr_in client_addr){
 	return -1;
 }
 
-//Receive and apply VehicleUpdatePacket from clients
-void* thread_server_udp_rec(void* args){
-	int socket_udp = args->socket_desc_udp_server;
-	while(connect && update){
-		char buf_recv[BUFFERSIZE];
-		struct sockaddr_in client_addr{0};
-		int bytes_read = recvfrom(socket_udp,buf_recv,BUFFERSIZE,0, (struct sockaddr*)&client_addr,&addrlen);
-		if(bytes_read == -1 || bytes_read == 0) break;
-		PacketHeader* ph = (PacketHeader*)buf_recv;
-		if(ph->size != bytes_read) continue;
-		int ret = udp_handler(socket_udp, buf_recv, client_addr);
-		ERROR_HELPER(ret, "[UDP] Error in udp_handler\n");
+void* thread_server_udp(void* args){
+	struct sockaddr_in client_addr{0};
+	char rec[BUFFERSIZE], send[BUFFERSIZE];
+	int ret, msg_len = 0;
+	socket_udp = *(int*) args;
+	update = 1;
+	while(communicate){
+		if(update){
+			//Global update via UDP
+			printf("%s...Global update.\n", UDP);
+			WorldUpdatePacket* wup = (WorldUpdatePacket*)malloc(sizeof(WorldUpdatePacket));
+			PacketHeader ph;
+			ph->type = WorldUpdate;
+			wup->header = ph;
+			int n = users->size;
+			wup->vehicles = n;
+			wup->updates = (ClientUpdate*)malloc(n*sizeof(ClientUpdate));
+			
+			//Through a for cicle we handle every user
+			sem_wait(sem_user);
+			ClientList* clients = users->first;
+			int i;
+			for(i=0; i < n; i++){
+				ClientUpdate* cu = (ClientUpdate*)malloc(sizeof(ClientUpdate));
+				cu->id = clients->id;
+				cu->x = clients->x;
+				cu->y = clients->y;
+				cu->theta = clients->theta;
+				wup->updates[i] = *cu;
+				clients = clients->next;
+			}
+			sem_post(sem_user);
+			
+			msg_len = Packet_serialize(send, &wup->header);
+			if(msg_len == -1){
+				printf("%s...Error in serialization.\n", UDP);
+				update = 0;
+				continue;
+			}
+			printf("%s...Packet serialized.\n", UDP);
+			
+			//Send updates to every user
+			sem_wait(sem_user);
+			clients = users->first;
+			int i;
+			for(i=0; i < n; i++){
+				ret = sendto(socket_udp, send, msg_len, 0, (struct sockaddr*) &clients->user_addr, sizeof(clients->user_addr));
+				clients = clients->next;
+			}
+			sem_post(sem_user);
+			printf("%s...Updates sent.\n", UDP);
+			
+			printf("%s...Freeing resources in UDP.\n", UDP);
+			Packet_free(&cu->header);
+			update = 0;
+		}
+		
+		//Receiving data via UDP
+		memset(&client_addr, 0, sizeof(struct sockaddr_in));
+		ret = recvfrom(socket_udp, rec, BUFFERSIZE, 0, (struct sockaddr*) &client_addr, sizeof(struct sockaddr_in));
+		ERROR_HELPER(ret, "Error in recvfrom.\n");
 	}
-	pthread_exit(NULL);	
 }
 
 int tcp_packet_handler(int tcp_socket_desc, int id, char* buf, Image* surface_elevation, Image* elevation_texture){
@@ -202,187 +250,60 @@ void* client_thread_handler(void* args){
 	char buf_recv[BUFFERSIZE];
 	int ph_len = sizeof(PacketHeader);
 	
-	//Receiving packet
-	while(msg_len < ph_len){
-		ret = recv(client_desc, buf_recv + msg_len, ph_len - msg_len, 0);
-		if(ret == -1 && errno == EINTR) continue;
-		ERROR_HELPER(ret, "Error in receiving data in tcp.\n");
-		msg_len += ret;
+	while(communicate){
+		//Receiving packet
+		while(msg_len < ph_len){
+			ret = recv(client_desc, buf_recv + msg_len, ph_len - msg_len, 0);
+			if(ret == -1 && errno == EINTR) continue;
+			ERROR_HELPER(ret, "Error in receiving data in tcp.\n");
+			msg_len += ret;
+		}
+		
+		PacketHeader* header = (PacketHeader*) buf_recv;
+		int size = header->size - ph_len;
+		msg_len = 0;
+		
+		while(msg_len < size){
+			ret = recv(client_desc, buf_recv + msg_len + ph_len, size - msg_len, 0);
+			if (ret==-1 && errno == EINTR) continue;
+			ERROR_HELPER(ret, "Error in receiving data in tcp.\n");
+			msg_len += ret;
+		}
+		
+		ret = tcp_packet_handler(client_desc, args->client_desc, buf_recv, args->surface_elevation, args->elevation_texture);
+		if(ret == 1) printf("%s...Packet managed successfully.\n", TCP);
+		else printf("%s...Failure in managing packet\n", TCP);
 	}
-	
-	PacketHeader* header = (PacketHeader*) buf_recv;
-	int size = header->size - ph_len;
-	msg_len = 0;
-	
-	while(msg_len < size){
-		ret = recv(client_desc, buf_recv + msg_len + ph_len, size - msg_len, 0);
-		if (ret==-1 && errno == EINTR) continue;
-		ERROR_HELPER(ret, "Error in receiving data in tcp.\n");
-		msg_len += ret;
-	}
-	
-	ret = tcp_packet_handler(client_desc, args->client_desc, buf_recv, args->surface_elevation, args->elevation_texture);
-	if(ret == 1) printf("%s...Packet managed successfully.\n", TCP);
-	else printf("%s...Failure in managing packet\n", TCP);
 	
 	pthread_exit(NULL);
-	
-	/*PacketHeader* ph = (PacketHeader*) packet;
-	
-	if(ph->type == VehicleUpdate){
-		printf("%s...Vehicle update received.\n", TCP);
-		VehicleUpdatePacket* vup = (VehicleUpdatePacket*)Packet_deserialize(packet, ph->size);
-		
-		if(vup->id < 0){
-			Packet_free(&vup->header);
-			return -1;
-		} 
-		
-		sem_wait(sem_user);
-		ClientListElement* user = clientList_find(users, vup->id);
-		
-		if(user == NULL){
-			Packet_free(&vup->header);
-			sem_post(sem_user);
-			return -1;
-		}
-		
-		user->rotational_force = vup->rotational_force;
-		user->translational_force = vup->translational_force;
-		user->x = vup->x;
-		user->y = vup->y;
-		user->theta = vup->theta;
-
-		sem_post(sem_user);
-
-		Packet_free(&vup->header);
-		return 0;
-	}
-	
-	if(ph->type == GetId){
-		char buf_send[BUFFERSIZE];
-		IdPacket* idp = (IdPacket*)Packet_deserialize(packet, ph->size);
-		PacketHeader* ph;
-		ph->type = GetId;
-		idp->header = ph;
-		idp->id = id;
-		int msg_len = Packet_serialize(buf_send, &(idp->ph));
-		printf("%s...%d bytes written in the buffer.\n", TCP, msg_len);
-		int ret = 0,  bytes_sent = 0;
-		while(bytes_sent < msg_len){
-			ret = send(socket_desc, buf_send + bytes_sent, msg_len - bytes_sent, 0);
-			if(ret == -1 && errno == EINTR) continue;
-			ERROR_HELPER(ret, "Error in sending tcp.\n");
-			if(ret == 0) break;
-			bytes_sent += ret;
-		}
-		Packet_free(&(idp->ph));
-		printf("%s...Sent %d bytes.\n", TCP, bytes_sent);
-		return 0;
-	}
-	
-	else if(ph->type == GetTexture){
-		char buf_send[BUFFERSIZE];
-		ImagePacket* imp = (ImagePacket*)packet;
-		if(imp->id >= 0){
-			char buf_send[BUFFERSIZE];
-			ImagePacket* im_pack = (ImagePacket*)malloc(sizeof(ImagePacket));
-			PacketHeader ph;
-			ph->type = PostTexture;
-			pthread_mutex_lock(&mutex);
-			ClientListElement* elem = clientList_find(users, imp->id);
-			if(elem == NULL){
-				free(im_pack);
-				free(imp);
-				pthread_mutex_unlock(&mutex);
-				return -1;
-			}
-			pthread_mutex_unlock(&mutex);
-			im_pack->id = imp->id;
-			im_pack->image = elem->v_texture;
-			im_pack->header = ph;
-			int msg_len = Packet_serialize(buf_send, &im_pack->header);
-			printf("%s...%d bytes written in buffer.\n",TCP, msg_len);
-			int ret = 0, bytes_sent = 0;
-			while (bytes_sent < msg_len) {
-				ret = send(socket_desc, buf_send + bytes_sent, msg_len - bytes_sent, 0);
-				if (ret == -1 && errno == EINTR) continue;
-				ERROR_HELPER(ret, "Error in sending map tcp.\n");
-				bytes_sent += ret;
-			}
-			free(im_pack);
-			printf("%s...Sent %d bytes.\n",TCP, bytes_sent);
-			return 0;
-		}
-	}
-	
-	else return -1;*/
 }
 
 void* thread_server_tcp(void* args){
 	int ret;
 	tcp_args* tcp_arg = (tcp_args*) args;
 	struct sockaddr_in client_addr{0};
-	int socket_desc_tcp = accept(socket_tcp, (struct sockaddr*) &client_addr, sizeof(struct sockaddr_in));
-	ERROR_HELPER(socket_desc_tcp, "Error in accept tcp connection.\n");
-	
 	pthread_t client_thread;
 	
-	//client thread args
-	tcp_args client_args;
-	client_args->client_desc = socket_desc_tcp;
-	client_args->elevation_texture = tcp_arg->elevation_texture;
-	client_args->surface_elevation = tcp_arg->surface_elevation;
-	
-	//thread creation
-	ret = pthread_create(client_thread, NULL, client_thread_handler, &client_args);
-	PTHREAD_ERROR_HELPER(ret, "Error in spawning client thread tcp.\n");
-	
-	//we don't wait for client thread, do detach
-	ret = pthread_detach(client_thread);
-	PTHREAD_ERROR_HELPER(ret, "Error in detach client thread tcp.\n");
-	
-	pthread_exit(NULL);
-	
-	/*int bytes_read, msg_len, ret;
-	
-	printf("%s...Server TCP routine.\n", SERVER);
-	printf("%s...Add user to list.\n", SERVER);
-	
-	sem_wait(sem_user);
-	ClientListElement* user = (ClientListElement*)malloc(sizeof(ClientListElement));
-	// -> aggiungere utente, ricordarsi di caricare clientList su git
-	clientList_add(users, user);
-	sem_post(sem_user);
-	
-	while(1){
-		bytes_read = 0;
-		char rec[BUFFERSIZE], send[BUFFERSIZE];
+	while(accept){
+		int socket_desc_tcp = accept(socket_tcp, (struct sockaddr*) &client_addr, sizeof(struct sockaddr_in));
+		ERROR_HELPER(socket_desc_tcp, "Error in accept tcp connection.\n");
 		
-		//receive from socket
-		bytes_read = recv(socket_tcp, rec, BUFFERSIZE, 0);
-		printf("%s...Read %d bytes.\n", TCP, bytes_read);
+		//client thread args
+		tcp_args client_args;
+		client_args->client_desc = socket_desc_tcp;
+		client_args->elevation_texture = tcp_arg->elevation_texture;
+		client_args->surface_elevation = tcp_arg->surface_elevation;
 		
-		if(bytes_read == 0) continue;
+		//thread creation
+		ret = pthread_create(client_thread, NULL, client_thread_handler, &client_args);
+		PTHREAD_ERROR_HELPER(ret, "Error in spawning client thread tcp.\n");
 		
-		//call a handler that will send to user
-		msg_len = packet_handler_tcp(rec, send, tcp_args);
-		if(msg_len == 0) continue;
-		
-		ret = send(socket_tcp, send, msg_len, 0);
-		if(ret == 0) continue;
-		printf("%s...Packet sent successfully.\n", TCP);
+		//we don't wait for client thread, detach
+		ret = pthread_detach(client_thread);
+		PTHREAD_ERROR_HELPER(ret, "Error in detach client thread tcp.\n");
 	}
-	//if exit from cicle, i have to close
-	printf("%s...User disconnected.\n", TCP);
 	
-	sem_wait(sem_user);
-	clientList_remove(users, user);
-	sem_post(sem_user);
-	
-	free(user);
 	pthread_exit(NULL);
-	*/
 }			
 
 int main(int argc, char **argv) {
@@ -459,14 +380,15 @@ int main(int argc, char **argv) {
   //creating thread for UDP communication
   pthread_t thread_udp;
   
-  thread_server_udp_args* udp_args = (thread_server_udp_args*)malloc(sizeof(thread_server_udp_args));
-  udp_args->socket_desc_udp_server = socket_udp;
-  udp_args->clients = users;
+  udp_args udp_arg;
+  udp_arg->surface_texture = surface_texture;
+  udp_arg->surface_elevation = surface_elevation;
+  udp_arg->vehicle_texture = vehicle_texture;
   
-  ret = pthread_create(&thread_udp, NULL, thread_server_udp_rec, udp_args);
+  ret = pthread_create(&thread_udp, NULL, thread_server_udp, &udp_arg);
   PTHREAD_ERROR_HELPER(ret, "Error in creating UDP thread\n");
   
-  ret = pthread_detach(thread_udp);
+  ret = pthread_detach(thread_udp);		//we don't wait for this thread, detach
   PTHREAD_ERROR_HELPER(ret, "Error in detach UDP thread\n");
   
   //TCP socket
@@ -512,16 +434,15 @@ int main(int argc, char **argv) {
   
   World_init(&world, surface_elevation, surface_texture,  0.5, 0.5, 0.5);
   
-  //threads
+  //tcp thread
   pthread_t tcp_connect;
   
-  //tcp thread
   tcp_args tcp_arg;
   tcp_arg->elevation_texture = surface_texture;
   tcp_arg->surface_texture = surface_elevation;
   
   ret = pthread_create(&tcp_connect, NULL, thread_server_tcp, &tcp_arg);
-  PTHREAD_ERROR_HELPER(ret, "Error in spawning tcp thread.\n");
+  PTHREAD_ERROR_HELPER(ret, "Error in spawning tcp thread.\n"); 
   
   ret = pthread_join(tcp_connect, NULL);
   PTHREAD_ERROR_HELPER(ret, "Error in join tcp thread.\n");
