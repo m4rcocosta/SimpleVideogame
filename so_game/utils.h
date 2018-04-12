@@ -6,12 +6,12 @@ typedef struct tcp_args{
 
 typedef struct thread_server_tcp_args{
     int socket_desc_tcp_client;
-    clientList* connected;
+    ClientList* connected;
 }thread_server_tcp_args;
 
 typedef struct thread_server_udp_args{
     int socket_desc_udp_server;
-    clientList* connected;
+    ClientList* connected;
 }thread_server_udp_args;
 
 typedef struct playerWorld{
