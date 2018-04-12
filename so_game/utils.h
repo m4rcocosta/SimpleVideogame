@@ -1,3 +1,5 @@
+#include "clientList.h"
+
 typedef struct tcp_args{
 	int client_desc;
 	Image* elevation_texture;
