@@ -1,4 +1,4 @@
-VideoGame (3 people)
+VideoGame (2 people)
    - implement a distributed videogame
      Server Side:
      - the server operates in both TCP and UDP
