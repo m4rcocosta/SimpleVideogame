@@ -1,5 +1,7 @@
 # ProgettoSO-VideoGame
-Progetto di Sistemi Operativi (VideoGame)
+Progetto per il corso di Sistemi Operativi
+
+Corso di laurea in Ingegneria Informatica e Automatica, Sapienza Università di Roma, A.A. 2017/2018
 
 ## Developers
 * [*Marco Costa*](https://github.com/marco-96)
@@ -9,5 +11,5 @@ Progetto di Sistemi Operativi (VideoGame)
 * C
 
 ## Documentation
-* [DOCUMENTATION.md](DOCUMENTATION.md)
+Read [DOCUMENTATION.md](DOCUMENTATION.md) for more details.
 
