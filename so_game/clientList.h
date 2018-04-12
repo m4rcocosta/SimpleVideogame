@@ -1,18 +1,12 @@
 #pragma once
 #include <netinet/in.h>
-#include <time.h>
 #include "vehicle.h"
+
 typedef struct ClientListElement {
   struct ClientListElement* next;
   int id;
   float x, y, theta, prev_x, prev_y, x_shift, y_shift;
-
   struct sockaddr_in user_addr;
-  struct timeval last_update_time;
-  struct timeval creation_time;
-  struct timeval world_update_time;
-  char is_addr_ready;
-  int afk_counter;
   char inside_world;
   Vehicle* vehicle;
   Image* v_texture;
