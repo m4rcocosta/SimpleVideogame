@@ -5,7 +5,8 @@ AR=ar
 
 
 BINS=libso_game.a\
-     so_game\
+     so_game_client\
+	 so_game_server\
      test_packets_serialization 
 
 OBJS = vec3.o\
@@ -16,6 +17,8 @@ OBJS = vec3.o\
        world.o\
        world_viewer.o\
        so_game_protocol.o\
+	   so_game_client.o\
+	   so_game_server.o\
 
 HEADERS=helpers.h\
 	image.h\
@@ -26,6 +29,8 @@ HEADERS=helpers.h\
 	vehicle.h\
 	world.h\
 	world_viewer.h\
+	common.h\
+	utils.h\
 
 %.o:	%.c $(HEADERS)
 	$(CC) $(CCOPTS) -c -o $@  $<
