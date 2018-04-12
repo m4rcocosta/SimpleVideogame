@@ -1,7 +1,6 @@
 #pragma once
 #include <netinet/in.h>
 #include <time.h>
-#include "../av_framework/image.h"
 #include "vehicle.h"
 typedef struct ClientListElement {
   struct ClientListElement* next;
