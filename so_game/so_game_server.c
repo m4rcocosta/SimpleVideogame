@@ -25,6 +25,7 @@ ClientList* users;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 sem_t* sem_user;
 int socket_tcp, socket_udp;		//network variables
+World world;
 
 
 void handler(int signal){
@@ -173,8 +174,25 @@ int tcp_packet_handler(int tcp_socket_desc, int id, char* buf, Image* surface_el
 		printf("%s...Sent texture to id %d.\n",TCP, id);
 		return 1;
 	}
-	////
-	
+	else if(header->type == PostTexture){
+		PacketHeader* ph = Packet_deserialize(buf, header->size);
+		ImagePacket* imp = (ImagePacket*) ph;
+		
+		Vehicle* vehicle = (Vehicle*)malloc(sizeof(Vehicle));
+		Vehicle_init(vehicle, &world, id, imp->image);
+		World_addVehicle(&world, vehicle);
+		
+		Packet_free(ph);
+		free(imp);
+		printf("%s...Texture received id %d.\n", TCP, id);
+		return 1;
+	}
+	//error case
+	else{
+		printf("%s...Unknown packet type id %d.\n", TCP, id);
+		return -1;
+	}
+	return -1;
 }
 
 void* client_thread_handler(void* args){
