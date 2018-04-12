@@ -13,6 +13,8 @@
 #define TCP		"[TCP] "
 #define UDP		"[UDP] "
 
+#define DEBUG	1
+
 
 
 #define GENERIC_ERROR_HELPER(cond, errCode, msg) do {               \
@@ -26,12 +28,3 @@
 #define ERROR_HELPER(ret, msg)          GENERIC_ERROR_HELPER((ret < 0), errno, msg)
 #define PTHREAD_ERROR_HELPER(ret, msg)  GENERIC_ERROR_HELPER((ret != 0), ret, msg)
 
-
-struct args{ //USED BY A THREAD IN SERVER
-	Image * surface_texture;
-	Image * elevation_texture;
-	Image * vehicle_texture;
-	int tcp_socket;
-	int udp_socket;
-	int idx;
-};
