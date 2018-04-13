@@ -220,6 +220,22 @@ int tcp_packet_handler(int tcp_socket_desc, int id, char* buf, Image* surface_el
 void* client_thread_handler(void* args){
 	tcp_args* args = (tcp_args*)args;
 	int client_desc = args->client_desc;
+	
+	sem_wait(sem_user);
+	printf("%s...Adding user with id %d.\n", TCP, client_desc);
+	ClientListElement* user = (ClientListElement*)malloc(sizeof(ClientListElement));
+	user->texture = NULL;
+	user->id = client_desc;
+	user->vehicle = NULL;
+	user->x_shift = 0;
+	user->y_shift = 0;
+	user->prev_x = -1;
+	user->prev_y = -1;
+	clientList_add(users, user);
+	printf("%s...User added successfully.\n", TCP);
+	clientList_print(users);
+	sem_post(sem_user);
+	
 	int msg_len = 0, ret;
 	char buf_recv[BUFFERSIZE];
 	int ph_len = sizeof(PacketHeader);
@@ -249,12 +265,36 @@ void* client_thread_handler(void* args){
 		else printf("%s...Failure in managing packet\n", TCP);
 	}
 	
+	//if we exit from the while cicle, we have to deallocate and close
+	printf("%s...User %d disconnected.\n", TCP, client_desc);
+	printf("%s...Closing.\n", TCP);
+	
+	sem_wait(sem_user);
+	ClientListElement* elem = clientList_find(users, client_desc);
+	if(elem == NULL){
+		sem_post(sem_user);
+		close(client_desc);
+		pthread_exit(NULL);
+	}
+	ClientListElement* canc = clientList_remove(users, elem);
+	if(canc == NULL){
+		sem_post(sem_user);
+		close(client_desc);
+		pthread_exit(NULL);
+	}
+	World_detachVehicle(canc->vehicle);
+	free(canc->vehicle);
+	Image_free(canc->texture);
+	free(canc);
+	sem_post(sem_user);
+	close(client_desc);
 	pthread_exit(NULL);
 }
 
 void* thread_server_tcp(void* args){
 	int ret;
 	tcp_args* tcp_arg = (tcp_args*) args;
+	int client_desc = args->client_desc;
 	struct sockaddr_in client_addr{0};
 	pthread_t client_thread;
 	
