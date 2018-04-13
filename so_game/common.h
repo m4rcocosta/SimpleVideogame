@@ -13,8 +13,6 @@
 #define TCP		"[TCP] "
 #define UDP		"[UDP] "
 
-#define DEBUG	1
-
 
 
 #define GENERIC_ERROR_HELPER(cond, errCode, msg) do {               \
