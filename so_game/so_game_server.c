@@ -42,32 +42,6 @@ void handler(int signal){
 		}
 }
 
-int udp_handler(int socket_udp,char* buf_rcv,struct sockaddr_in client_addr){
-	PacketHeader* ph = (PacketHeader*) buf_recv;
-	if(ph->type == VehicleUpdate){
-		VehicleUpdatePacket* vup = (VehicleUpdate*)Packet_deserialize(buf_recv, ph->size);
-		pthread_mutex_lock(&mutex);
-		ClientListElement* user = clientList_find(user, vup->id);
-		if(user == NULL){
-			printf("[UDP] Cannot find the user with id: %d.\n", vup->id);
-			Packet_free(&vup->header);
-			pthread_mutex_unlock(&mutex);
-			return -1;
-		}
-		if(!user->inside_world){
-			printf("[UDP] The vehicle of %d isn't inside the game.\n", vup->id);
-			pthread_mutex_unlock(&mutex);
-			return 0;
-		}
-		user->prev_x = user->x;
-		user->prev_y = user->y;
-        user->user_addr = client_addr;
-        printf("[UDP] VehicleUpdatePacket with force_translational_update: %f force_rotation_update: %f.\n",vup->translational_force,vup->rotational_force);
-        Packet_free(&vup->header);
-        return 0;
-	}
-	return -1;
-}
 
 void* thread_server_udp(void* args){
 	struct sockaddr_in client_addr{0};
