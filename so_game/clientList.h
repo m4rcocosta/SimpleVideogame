@@ -7,9 +7,8 @@ typedef struct ClientListElement {
   int id;
   float x, y, theta, prev_x, prev_y, x_shift, y_shift;
   struct sockaddr_in user_addr;
-  char inside_world;
   Vehicle* vehicle;
-  Image* v_texture;
+  Image* texture;
   float rotational_force, translational_force;
 } ClientListElement;
 
