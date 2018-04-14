@@ -9,8 +9,6 @@
 #include <pthread.h>
 #include <sys/socket.h>
 #include <signal.h>
-#include <time.h>
-#include <fcntl.h>
 
 #include "image.h"
 #include "surface.h"
@@ -26,60 +24,7 @@ WorldViewer viewer;
 World world;
 Vehicle* vehicle; // The vehicle
 
-int my_id;
-int soclet_tcp; //socket tcp
-int server_connected;
-playerWorld player_world;
-sem_t* world_update_sem;
-
-void* Sender_UDP(void* args) {
-  udpArgs udp_args = (udpArgs*) args;
-  struct sockaddr_in server_addr = udp_args.server_addr;
-  int socket_udp = udp_args.socket_udp;
-  int server_len = sizeof(server_addr);
-  while(server_connected) {
-    ret = send_updates(socket_udp, server_addr, server_len);
-    PTHREAD_ERROR_HELPER(ret, "Error in send_updates function");
-  }
-  close(s);
-  return 0;
-}
-
-void* Receiver_UDP(void* args) {
-  udpArgs udp_args = (udpArgs*) args;
-  struct sockaddr_in server_addr = udp_args.server_addr;
-  int socket_udp = udp_args.socket_udp;
-  int server_len = sizeof(server_addr);
-  int bytes_read;
-  char receive_buffer[BUFFERSIZE];
-  while(server_connected) {
-    bytes_read = recvfrom(socket_udp, receive_buffer, BUFFERSIZE, 0, (struct sockaddr*) &server_addr, server_len);
-    PTHREAD_ERROR_HELPER(bytes_read, "Error in recvfrom function.\n");
-    ret = packet_analysis(receive_buffer, bytes_read);
-    PTHREAD_ERROR_HELPER(ret, "Error in packet_analysis function.\n");
-  }
-}
-
-int packet_analisys(char* buffer, int len) {	
-	World world_aux = world;
-	ret=sem_wait(world_update_sem);
-	PTHREAD_ERROR_HELPER(ret,"Error in sem_wait function in world_updater.\n");
-	int i, new_players=0;
-  WorldUpdatePacket* deserialized_wu_packet = (WorldUpdatePacket*) Packet_deserialize(world_buffer, world_buffer_size);
-	if(deserialized_wu_packet -> header -> type != WorldUpdate) return 0;
-	// serve?? if(deserialized_wu_packet->header->size != len) return 0; perchè l'udp non ha trasportato tutti i dati?
-	ClientUpdate* aux = deserialized_wu_packet -> updates;
-	while(aux != NULL){
-		for(int i=0; i < WORLDSIZE; i++){
-			if (player_world -> id_list[i] == aux -> id){
-				Vehicle_setXYTheta(player_world -> vehicles[i], deserialized_wu_packet -> updates -> x, deserialized_wu_packet -> updates -> y, deserialized_wu_packet -> updates -> theta);
-				break;
-			}
-		new_players=1;
-		}
-	}
-	if (deserialized_wu_packet -> num_vehicles != player_world -> players_online || new_players) check_newplayers(deserialized_wu_packet); //Add new players
-}
+int ret, my_id;
 
 void keyPressed(unsigned char key, int x, int y)
 {
@@ -187,8 +132,28 @@ int main(int argc, char **argv) {
   Image* map_texture;
   Image* my_texture_from_server;
 
-  my_texture_for_server;
+  //My code
+  my_texture_for_server = my_texture;
 
+  //TCP socket
+  int socket_tcp;
+  struct sockaddr_in server_addr{0};
+
+  server_addr.sin_addr.in_addr = inet_addr(SERVER_IP);
+  server_addr.sin_family = AF_INET;
+  server_addr.sin_port = htons(argv[1]); //TCP port comes from agrv
+
+  ret = connect(socket_tcp, (struct sockaddr*) &server_addr, sizeof(struct sockaddr_in));
+  ERROR_HELPER(socket_tcp, "Error while creating socket_tcp");
+
+  //Elevation map request
+  IdPacket* elevation_rq = (IdPacket*) malloc(sizeof(IdPacket));
+  PacketHeader elevation_header_rq;
+  elevation_rq -> header = &elevation_header_rq;
+  elevation_rq -> id = my_id;
+  elevation_rq -> header -> size = sizeof(IdPacket);
+  elevation_rq -> header -> type = GetElevation;
+  //to complete
 
   // construct the world
   World_init(&world, map_elevation, map_texture, 0.5, 0.5, 0.5);
@@ -203,6 +168,30 @@ int main(int argc, char **argv) {
   // when the server notifies a new player has joined the game
   // request the texture and add the player to the pool
   /*FILLME*/
+
+
+  client_args* args = malloc(sizeof(client_args));
+  args -> socket_tcp = socket_tcp;
+  args -> socket_udp = socket_udp;  
+  args -> id = my_id;
+  args -> v = vehicle;
+  args -> map_texture = map_texture;
+  args -> server_addr = server_addr;
+
+  pthread_t thread_tcp, thread_udp;
+
+  ret = pthread_create(&thread_tcp, NULL, handler_tcp, args);
+  PTHREAD_ERROR_HELPER(ret, "Error while creating thread_tcp");
+
+  ret = pthread_detach(&thread_tcp);
+  PTHREAD_ERROR_HELPER(ret, "Error while detaching thread_tcp");
+
+  ret = pthread_create(&thread_udp, NULL, handler_udp, args);
+  PTHREAD_ERROR_HELPER(ret, "Error while creating thread_udp");
+
+  ret = pthread_detach(&thread_udp);
+  PTHREAD_ERROR_HELPER(ret, "Error while detaching thread_udp");
+
   
 
   printf("World runs.\n");
