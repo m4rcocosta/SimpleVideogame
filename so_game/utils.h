@@ -13,10 +13,25 @@ typedef struct udp_args{
     Image* vehicle_texture;
 }udp_args;
 
-typedef struct playerWorld{
-    int id_list[WORLDSIZE];
-    int players_online;
-    Vehicle** vehicles;
-}localWorld;
+typedef struct client_args{
+    int socket_tcp;                   //Socket descriptor for TCP comunication
+    int socket_udp;                   //Socket descriptor for UDP comunication
+    int id;                           //ID received from server
+    Vehicle v;                        //Client's vehicle
+    Image* map_texture;               //Map texture
+    struct sockaddr_in server_addr;
+}client_args;
+
+//TCP receive function
+int receive_tcp(int socket, void *buf, size_t len, int flags);
+
+//TCP send function
+int send_tcp(int socket, const void *buf, size_t len, int flags);
+
+//UDP receive function
+int receive_udp(int socket, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen);
+
+//UDP send function
+int send_udp(int socket, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen);
 
 
