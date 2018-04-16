@@ -99,26 +99,38 @@ void idle(void) {
 }
 
 int main(int argc, char **argv) {
-  if (argc<3) {
-    printf("usage: %s <port_number> <player texture>\n", argv[1]);
-    exit(-1);
+
+  char *ip_address, *vehicle_texture; //From argv, default LOCALHOST and VEHICLE
+
+  if (argc == 1) {
+    ip_address = LOCALHOST;
+    vehicle_texture = VEHICLE;
   }
 
-  //check port number
-  long tmp = strtol(argv[1], NULL, 0);
-  if(tmp < 1024 || tmp > 49151) {
-    printf("Use a port number between 1024 abd 49151.\n");
-    exit(1);
+  else if (argc == 2) {
+    ip_address = argv[1];
+    vehicle_texture = VEHICLE;
   }
 
-  printf("loading texture image from %s ... ", argv[2]);
-  Image* my_texture = Image_load(argv[2]);
+  else if (argc == 3) {
+    ip_address = argv[1];
+    vehicle_texture = argv[2];
+  }
+
+  else {
+    printf("Error: insert <server_address>(Default:'127.0.0.1') <player texture>(Default: 'images/arrow-right.ppm')\n");
+  }
+
+
+
+  printf("loading texture image from %s ... ", vehicle_texture);
+  Image* my_texture = Image_load(vehicle_texture);
   if (my_texture) {
     printf("Done! \n");
   } else {
     printf("Fail! \n");
   }
-  printf("[Client] Starting... \n");
+  printf("%sStarting... \n", CLIENT);
   
   Image* my_texture_for_server;
   // todo: connect to the server
@@ -139,9 +151,9 @@ int main(int argc, char **argv) {
   int socket_tcp;
   struct sockaddr_in server_addr{0};
 
-  server_addr.sin_addr.in_addr = inet_addr(SERVER_IP);
+  server_addr.sin_addr.s_addr = inet_addr(argv[1]);
   server_addr.sin_family = AF_INET;
-  server_addr.sin_port = htons(argv[1]); //TCP port comes from agrv
+  server_addr.sin_port = htons(TCP_PORT); //TCP port is defined in common.h
 
   ret = connect(socket_tcp, (struct sockaddr*) &server_addr, sizeof(struct sockaddr_in));
   ERROR_HELPER(socket_tcp, "Error while creating socket_tcp");
