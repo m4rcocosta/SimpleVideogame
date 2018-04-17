@@ -118,7 +118,7 @@ int main(int argc, char **argv) {
   }
 
   else {
-    printf("Error: insert <server_address>(Default:'127.0.0.1') <player texture>(Default: 'images/arrow-right.ppm')\n");
+    printf("Error: insert <server_address> (Default:'127.0.0.1') <vehicle_texture> (Default: 'images/arrow-right.ppm')\n");
   }
 
 
@@ -149,14 +149,31 @@ int main(int argc, char **argv) {
 
   //TCP socket
   int socket_tcp;
-  struct sockaddr_in server_addr{0};
+  struct sockaddr_in server_addr_tcp{0};
 
-  server_addr.sin_addr.s_addr = inet_addr(argv[1]);
-  server_addr.sin_family = AF_INET;
-  server_addr.sin_port = htons(TCP_PORT); //TCP port is defined in common.h
+  socket_tcp = socket(AF_INET, SOCK_STREAM, 0);
+  ERROR_HELPER(socket_tcp, "Error while creating socket_tcp");
+
+  server_addr_tcp.sin_addr.s_addr = inet_addr(ip_address);
+  server_addr_tcp.sin_family = AF_INET;
+  server_addr_tcp.sin_port = htons(TCP_PORT); //TCP port is defined in common.h
 
   ret = connect(socket_tcp, (struct sockaddr*) &server_addr, sizeof(struct sockaddr_in));
-  ERROR_HELPER(socket_tcp, "Error while creating socket_tcp");
+  ERROR_HELPER(socket_tcp, "Error while connecting on socket_tcp");
+
+  //UDP socket
+  int socket_udp;
+  struct sockaddr_in server_addr_udp{0};
+
+  socket_udp = socket(AF_INET, SOCK_DGRAM, 0);
+  ERROR_HELPER(socket_udp, "Error while creating socket_udp");
+
+  server_addr_udp.sin_addr.s_addr = inet_addr(ip_address);
+  server_addr_udp.sin_family = AF_INET;
+  server_addr_udp.sin_port = htons(UDP_PORT);
+
+  ret = bind(socket_udp, (struct sockaddr*) &server_addr_udp, sizeof(struct sockaddr_in));
+  ERROR_HELPER(ret, "Error in bind function on socket_udp");
 
   //Elevation map request
   IdPacket* elevation_rq = (IdPacket*) malloc(sizeof(IdPacket));
@@ -165,7 +182,12 @@ int main(int argc, char **argv) {
   elevation_rq -> id = my_id;
   elevation_rq -> header -> size = sizeof(IdPacket);
   elevation_rq -> header -> type = GetElevation;
-  //to complete
+
+  char elevation_rq_server[BUFFERSIZE];
+  char elevation_map[BUFFERSIZE];
+  size_t elevation_rq_len = Packet_serialize(elevation_rq_server, &(elevation_rq ->header));
+
+  ret = send_tcp(socket_tcp, elevation_rq_server,)
 
   // construct the world
   World_init(&world, map_elevation, map_texture, 0.5, 0.5, 0.5);
