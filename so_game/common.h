@@ -5,13 +5,15 @@
 #include <errno.h>
 
 //Configuration parameters
-#define TCP_PORT 	  2048
-#define UDP_PORT      2801
-#define BUFFERSIZE	1000000
-#define LOCALHOST   "127.0.0.1"
-#define VEHICLE     "images/arrow-right.ppm"
+#define TCP_PORT 	              2048
+#define UDP_PORT                  2801
+#define BUFFERSIZE              1000000
+#define LOCALHOST            "127.0.0.1"
+#define VEHICLE              "images/arrow-right.ppm"
+#define MAP_ELEVATION        "images/maze.ppm"
+#define MAP_TEXTURE          "images/maze.pgm"
 
-//USED FOR DEBUG
+//Used for debug
 #define SERVER	"[SERVER] "
 #define CLIENT  "[CLIENT] "
 #define TCP		"[TCP] "
