@@ -21,5 +21,5 @@ The videogame consists of:
 
 ### How to run the videogame
 - Just use the `make` command to compile.
-- Start Server: digit `./so_game_server ./images/maze.pgm ./images/maze.ppm port_number` (`./so_game_server.c` is the Server executable, `./images/maze.pgm` is the map elevation, `./images/maze.ppm` is the map texture and `port_number` is the port number that is going to be used).
-- Start Client: digit `./so_game_client ./images/arrow-right.pgm port_number` (`so_game_client.c` is the Client executable, `./images/arrow-right.pgm` is the texture of the vehicle and `port_number` is the port number that will be used during the connection to the server).
+- Start Server: digit `./so_game_server <map_elevation> (Default: "./images/maze.pgm") <map_texture> (Default: "./images/maze.ppm")` (`./so_game_server.c` is the Server executable, `<map_elevation>` is the map elevation and `<map_texture>` is the map texture).
+- Start Client: digit `./so_game_client <server_address> (Default: "127.0.0.1") <vehicle_texture> (Default: "images/arrow-right.ppm")` (`./so_game_client` is the Client executable, `<server_address>` is the ip address that will be used during the connection to the server and `vehicle_texture` is the texture of the vehicle).
