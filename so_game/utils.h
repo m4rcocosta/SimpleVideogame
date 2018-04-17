@@ -23,15 +23,13 @@ typedef struct client_args{
 }client_args;
 
 //TCP receive function
-int receive_tcp(int socket, void *buf, size_t len, int flags);
+int receive_tcp(int socket, void *buffer, size_t length, int flags);
 
 //TCP send function
-int send_tcp(int socket, const void *buf, size_t len, int flags);
+int send_tcp(int socket, const void *buffer, size_t length, int flags);
 
 //UDP receive function
-int receive_udp(int socket, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen);
+int receive_udp(int socket, void *buffer, size_t length, int flags, struct sockaddr *src_addr, socklen_t *addrlen);
 
 //UDP send function
-int send_udp(int socket, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen);
-
-
+int send_udp(int socket, const void *buffer, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t addrlen);
