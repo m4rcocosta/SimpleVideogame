@@ -41,3 +41,8 @@ int receive_tcp(int socket, void *buffer, size_t length, int flags) {
     }
     return ret;
 }
+
+int send_tcp(int socket, const void *buffer, size_t length, int flags){
+	//to do
+}
+
