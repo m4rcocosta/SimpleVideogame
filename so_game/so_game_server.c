@@ -42,6 +42,14 @@ void handler(int signal){
 		}
 }
 
+void* udp_sender(void* args){
+	//to do
+}
+
+void* udp_receiver(void* args){
+	//to do
+}
+
 
 void* thread_server_udp(void* args){
 	struct sockaddr_in client_addr{0};
@@ -322,16 +330,11 @@ void* thread_server_tcp(void* args){
 
 int main(int argc, char **argv) {
   if (argc<4) {
-    printf("usage: %s <elevation_image> <texture_image> <port_number>\n", argv[1]);
+    printf("usage: %s <elevation_image> <texture_image>\n", argv[1]);
     exit(-1);
   }
   char* elevation_filename=argv[1];
   char* texture_filename=argv[2];
-  long tmp = strtol(argv[3], NULL, 0);		//tcp_port
-  if (tmp < 1024 || tmp > 49151) {
-	fprintf(stderr, "Use a port number between 1024 and 49151.\n");
-	exit(EXIT_FAILURE);
-  }
   char* vehicle_texture_filename="./images/arrow-right.ppm";
   printf("loading elevation image from %s ... ", elevation_filename);
 
@@ -392,18 +395,24 @@ int main(int argc, char **argv) {
   printf("%s... users list initialized\n", SERVER);
   
   //creating thread for UDP communication
-  pthread_t thread_udp;
+  pthread_t thread_udp_sender, thread_udp_receiver;
   
   udp_args udp_arg;
   udp_arg->surface_texture = surface_texture;
   udp_arg->surface_elevation = surface_elevation;
   udp_arg->vehicle_texture = vehicle_texture;
   
-  ret = pthread_create(&thread_udp, NULL, thread_server_udp, &udp_arg);
-  PTHREAD_ERROR_HELPER(ret, "Error in creating UDP thread\n");
+  ret = pthread_create(&thread_udp_receiver, NULL, udp_receiver, &udp_arg);
+  PTHREAD_ERROR_HELPER(ret, "Error in creating UDP receiver thread\n");
   
-  ret = pthread_detach(thread_udp);		//we don't wait for this thread, detach
-  PTHREAD_ERROR_HELPER(ret, "Error in detach UDP thread\n");
+  ret = pthread_create(&thread_udp_sender, NULL, thread_server_udp, &udp_arg);
+  PTHREAD_ERROR_HELPER(ret, "Error in creating UDP sender thread\n"); 
+  
+  ret = pthread_detach(thread_udp_receiver);	//we don't wait for this thread, detach
+  PTHREAD_ERROR_HELPER(ret, "Error in detach UDP receiver thread\n");
+  
+  ret = pthread_detach(thread_udp_sender);		//we don't wait for this thread, detach
+  PTHREAD_ERROR_HELPER(ret, "Error in detach UDP sender thread\n");
   
   //TCP socket
   printf("%s... initializing TCP\n", SERVER);
@@ -415,7 +424,7 @@ int main(int argc, char **argv) {
   
   struct sockaddr_in server_addr_tcp{0};
   server_addr_tcp.sin_family			= AF_INET;
-  server_addr_tcp.sin_port				= htons(tmp);
+  server_addr_tcp.sin_port				= htons(TCP_PORT);
   server_addr_tcp.sin_addr.s_addr	= INADDR_ANY;
   
   int reuseaddr_opt = 1;		//recover a server in case of a crash
