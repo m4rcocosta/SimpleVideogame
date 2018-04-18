@@ -26,7 +26,7 @@ sem_t* sem_user;
 int socket_tcp, socket_udp;		//network variables
 World world;
 
-
+//Signal handler
 void handler(int signal){
 	switch(signal){
 		case SIGHUP:
@@ -42,79 +42,77 @@ void handler(int signal){
 		}
 }
 
+//Function to send WorldUpdatePacket updates to every client connected
 void* udp_sender(void* args){
-	//to do
-}
-
-void* udp_receiver(void* args){
-	//to do
-}
-
-
-void* thread_server_udp(void* args){
-	struct sockaddr_in client_addr{0};
-	char rec[BUFFERSIZE], send[BUFFERSIZE];
-	int ret, msg_len = 0;
-	socket_udp = *(int*) args;
-	update = 1;
+	int socket_udp = *(int*) args;
 	while(communicate){
-		if(update){
-			//Global update via UDP
-			printf("%s...Global update.\n", UDP);
-			WorldUpdatePacket* wup = (WorldUpdatePacket*)malloc(sizeof(WorldUpdatePacket));
-			PacketHeader ph;
-			ph->type = WorldUpdate;
-			wup->header = ph;
-			int n = users->size;
-			wup->vehicles = n;
-			wup->updates = (ClientUpdate*)malloc(n*sizeof(ClientUpdate));
-			
-			//Through a for cicle we handle every user
-			sem_wait(sem_user);
-			ClientList* clients = users->first;
-			int i;
-			for(i=0; i < n; i++){
-				ClientUpdate* cu = (ClientUpdate*)malloc(sizeof(ClientUpdate));
-				cu->id = clients->id;
-				cu->x = clients->x;
-				cu->y = clients->y;
-				cu->theta = clients->theta;
-				wup->updates[i] = *cu;
-				clients = clients->next;
-			}
-			sem_post(sem_user);
-			
-			msg_len = Packet_serialize(send, &wup->header);
-			if(msg_len == -1){
-				printf("%s...Error in serialization.\n", UDP);
-				update = 0;
-				continue;
-			}
-			printf("%s...Packet serialized.\n", UDP);
-			
-			//Send updates to every user
-			sem_wait(sem_user);
-			clients = users->first;
-			int i;
-			for(i=0; i < n; i++){
-				ret = sendto(socket_udp, send, msg_len, 0, (struct sockaddr*) &clients->user_addr, sizeof(clients->user_addr));
-				clients = clients->next;
-			}
-			sem_post(sem_user);
-			printf("%s...Updates sent.\n", UDP);
-			
-			printf("%s...Freeing resources in UDP.\n", UDP);
-			Packet_free(&cu->header);
-			update = 0;
+		char buf[BUFFERSIZE];
+		PacketHeader ph;
+		ph->type = WorldUpdate;
+		WorldUpdatePacket* wup = (WorldUpdatePacket*)malloc(sizeof(WorldUpdatePacket));
+		wup->header = ph;
+		sem_wait(&sem_user);
+		ClientListElement* elem = users->first;
+		int n = 0;
+		while(elem != NULL){
+			n++;
+			elem = elem->next;
 		}
-		
-		//Receiving data via UDP
-		memset(&client_addr, 0, sizeof(struct sockaddr_in));
-		ret = recvfrom(socket_udp, rec, BUFFERSIZE, 0, (struct sockaddr*) &client_addr, sizeof(struct sockaddr_in));
-		ERROR_HELPER(ret, "Error in recvfrom.\n");
+		if(n == 0){
+			printf("%s...No client found in this moment, refresh.\n", UDP);
+			sem_post(sem_user);
+			continue;
+		}
+		wup->num_vehicles = n;
+		World_update(&world);
+		wup->updates = (ClientUpdate*)malloc(n * sizeof(ClientUpdate));
+		elem = users->first;
+		int i;
+		for(i = 0; elem != NULL; i++){
+			ClientUpdate* cup = &(wup->updates[i]);
+			cup->id = elem->id;
+			cup->x = elem->vehicle->x;
+			cup->y = elem->vehicle->y;
+			cup->theta = elem->vehicle->theta;
+			printf("%s...World updated with vehicle %d.\n", UDP, elem->id);
+			elem = elem->next;
+		}
+		int packet_len = Packet_serialize(buf, &wup->header);
+		elem = users->first;
+		while(elem != NULL){
+			int ret = sendto(socket_udp, buf, packet_len, 0, (struct sockadrr*) &elem->user_addr, sizeof(struct sockaddr_in));
+			ERROR_HELPER(ret, "Error in UDPSender.\n");
+			printf("%s...Sent WorldUpdate to %d client.\n", UDP, elem->id);
+			elem = elem->next;
+		}
+		Packet_free(&wup->header);
+		sem_post(sem_user);
 	}
+	pthread_exit(NULL);
 }
 
+//Manage VehicleUpdate packets received via UDP from the client
+int udp_packet_handler(int socket_udp, char* buf, struct sockaddr_in client_addr){
+	//to do
+} 
+
+//Function to receive via UDP 
+void* udp_receiver(void* args){
+	int socket_udp = *(int*)args;
+	while(communicate){
+		char buf[BUFFERSIZE];
+		struct sockaddr_in client_addr{0};
+		int read = recvfrom(socket_udp, buf, BUFFERSIZE, 0, (struct sockaddr*) &client_addr, sizeof(struct sockaddr_in));
+		if(read == -1 || read == 0) break;
+		PacketHeader* ph = (PacketHeader*) buf;
+		if(ph->size != read) continue;
+		int ret = udp_packet_handler(socket_udp, buf, client_addr);
+		if(ret == -1) printf("%s...Update of type VehicleUpdate didn't work.\n", UDP);
+	}
+	pthread_exit(NULL);
+}
+
+//Manage various types of packets received from the TCP connection
 int tcp_packet_handler(int tcp_socket_desc, int id, char* buf, Image* surface_elevation, Image* elevation_texture){
 	PacketHeader* header = (PacketHeader*) buf;
 	
@@ -170,7 +168,7 @@ int tcp_packet_handler(int tcp_socket_desc, int id, char* buf, Image* surface_el
 			bytes_sent += ret;
 		}
 
-		Packet_free(&(text_send->header));   // Libera la memoria del pacchetto non più utilizzato
+		Packet_free(&(text_send->header));
 		free(text_send);
 		
 		printf("%s...Texture sent to id %d.\n", TCP, id);
@@ -198,7 +196,7 @@ int tcp_packet_handler(int tcp_socket_desc, int id, char* buf, Image* surface_el
 			bytes_sent += ret;
 		}
 
-		Packet_free(&(elev->header));   // Libera la memoria del pacchetto non più utilizzato
+		Packet_free(&(elev->header));
 		free(elev);
 		
 		printf("%s...Sent texture to id %d.\n",TCP, id);
@@ -225,6 +223,9 @@ int tcp_packet_handler(int tcp_socket_desc, int id, char* buf, Image* surface_el
 	return -1;
 }
 
+//Add a new user to the list when it's connected
+//Function to receive packets from the client
+//Remove the user when it's disconnected
 void* client_thread_handler(void* args){
 	tcp_args* args = (tcp_args*)args;
 	int client_desc = args->client_desc;
@@ -299,6 +300,8 @@ void* client_thread_handler(void* args){
 	pthread_exit(NULL);
 }
 
+//Function to accept clients TCP connection
+//Spawn a new thread for every client connected
 void* thread_server_tcp(void* args){
 	int ret;
 	tcp_args* tcp_arg = (tcp_args*) args;
@@ -397,15 +400,16 @@ int main(int argc, char **argv) {
   //creating thread for UDP communication
   pthread_t thread_udp_sender, thread_udp_receiver;
   
-  udp_args udp_arg;
+  /*udp_args udp_arg;
   udp_arg->surface_texture = surface_texture;
   udp_arg->surface_elevation = surface_elevation;
   udp_arg->vehicle_texture = vehicle_texture;
+  */
   
-  ret = pthread_create(&thread_udp_receiver, NULL, udp_receiver, &udp_arg);
+  ret = pthread_create(&thread_udp_receiver, NULL, udp_receiver, &socket_udp);
   PTHREAD_ERROR_HELPER(ret, "Error in creating UDP receiver thread\n");
   
-  ret = pthread_create(&thread_udp_sender, NULL, thread_server_udp, &udp_arg);
+  ret = pthread_create(&thread_udp_sender, NULL, thread_server_udp, &socket_udp);
   PTHREAD_ERROR_HELPER(ret, "Error in creating UDP sender thread\n"); 
   
   ret = pthread_detach(thread_udp_receiver);	//we don't wait for this thread, detach
