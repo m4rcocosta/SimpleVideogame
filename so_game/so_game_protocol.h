@@ -49,6 +49,7 @@ typedef struct {
   int id;
   float rotational_force;
   float translational_force;
+  float x, y, theta; 	//added to update vehicle position in udp_handler (in so_game_server.c)
 } VehicleUpdatePacket;
 
 // block of the client updates, id of vehicle
