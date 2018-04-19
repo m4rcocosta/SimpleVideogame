@@ -93,7 +93,42 @@ void* udp_sender(void* args){
 
 //Manage VehicleUpdate packets received via UDP from the client
 int udp_packet_handler(int socket_udp, char* buf, struct sockaddr_in client_addr){
-	//to do
+	PacketHeader ph = (PacketHeader*) buf;
+	if(ph->type == VehicleUpdate){
+		VehicleUpdatePacket* vup = (VehicleUpdatePacket*) Packet_deserialize(buf, ph->size);
+		sem_wait(sem_user);
+		ClientListElement* elem = clientList_find(users, vup->id);
+		if(elem == NULL){
+			printf("%s...Cannot find client with id %d in client list.\n", UDP, vup->id);
+			Packet_free(&vup->header);
+			sem_post(sem_user);
+			return -1;
+		}
+		//update rotational and translational forces
+		elem->vehicle->rotational_force_update = vup->rotational_force;
+		elem->vehicle->translational_force_update = vup->translational_force;
+		elem->vehicle->x = vup->x;
+		elem->vehicle->y = vup->y;
+		elem->vehicle->theta = vup->theta;
+		WorldUpdate(&world);
+		//update x_shift and y_shift
+		if(elem->x >= elem->prev_x)
+			elem->x_shift = elem->x - elem->prev_x;
+		else
+			elem->x_shift = elem->prev_x - elem->x;
+		if(elem->y >= elem->prev_y)
+			elem->y_shift = elem->y - elem->prev_y;
+		else
+			elem->y_shift = elem->prev_y - elem->y;
+		elem->prev_x = elem->x;
+		elem->prev_y = elem->y;
+		
+		sem_post(sem_user);
+		printf("%s...Updated vehicle with id %d with rotational force: %f , translational force: %f.\n", UDP, vup->id, vup->rotational_force, vup->translational_force);
+		Packet_free(&vup->header);
+		return 0;
+	}
+	else return -1;
 } 
 
 //Function to receive via UDP 
