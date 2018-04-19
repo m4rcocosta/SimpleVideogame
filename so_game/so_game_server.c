@@ -20,7 +20,7 @@
 #include "clientList.h"
 #include "so_game_protocol.h"
 
-int accept = 1, update = 0, communicate = 1;
+int accept = 1, communicate = 1;
 ClientList* users;
 sem_t* sem_user;
 int socket_tcp, socket_udp;		//network variables
@@ -33,7 +33,6 @@ void handler(int signal){
 			break;
 		case SIGINT:
 			if(communicate) communicate = 0;
-			if(update) update = 0;
 			printf("%s...Closing server after a %s signal...\n", SERVER, signal);
 			break;
 		default:
@@ -77,11 +76,12 @@ void* udp_sender(void* args){
 			printf("%s...World updated with vehicle %d.\n", UDP, elem->id);
 			elem = elem->next;
 		}
-		int packet_len = Packet_serialize(buf, &wup->header);
+		size_t packet_len = Packet_serialize(buf, &wup->header);
 		elem = users->first;
 		while(elem != NULL){
-			int ret = sendto(socket_udp, buf, packet_len, 0, (struct sockadrr*) &elem->user_addr, sizeof(struct sockaddr_in));
+			int ret = send_udp(socket_udp, buf, packet_len, 0, (struct sockaddr*) &elem->user_addr, sizeof(struct sockaddr_in));
 			ERROR_HELPER(ret, "Error in UDPSender.\n");
+			if(ret == -2) printf("Error in connection between server and client with id %d.\n", elem->id);
 			printf("%s...Sent WorldUpdate to %d client.\n", UDP, elem->id);
 			elem = elem->next;
 		}
@@ -102,8 +102,8 @@ void* udp_receiver(void* args){
 	while(communicate){
 		char buf[BUFFERSIZE];
 		struct sockaddr_in client_addr{0};
-		int read = recvfrom(socket_udp, buf, BUFFERSIZE, 0, (struct sockaddr*) &client_addr, sizeof(struct sockaddr_in));
-		if(read == -1 || read == 0) break;
+		int read = receive_udp(socket_udp, buf, BUFFERSIZE, 0, (struct sockaddr*) &client_addr, sizeof(struct sockaddr_in));
+		if(read == -2) printf("Error in connection between server and client on socket %d.\n", socket_udp); 
 		PacketHeader* ph = (PacketHeader*) buf;
 		if(ph->size != read) continue;
 		int ret = udp_packet_handler(socket_udp, buf, client_addr);
@@ -124,22 +124,15 @@ int tcp_packet_handler(int tcp_socket_desc, int id, char* buf, Image* surface_el
 		idp->header = ph;
 		
 		char buf_send[BUFFERSIZE];
-		int packet_len = Packet_serialize(buf_send, &(idp->header));
+		size_t packet_len = Packet_serialize(buf_send, &(idp->header));
 		
 		//send the packet via socket
-		int bytes_sent = 0, ret;
-		while(bytes_sent < packet_len){
-			ret = send(tcp_socket_desc, buf_send + bytes_sent, packet_len - bytes_sent,0);
-			if(ret == -1 && errno == EINTR) continue;
-			ERROR_HELPER(ret, "Error in id communication.\n");
-			if(ret == 0) break;
-			bytes_sent += ret;
-		}
+		int ret = send_tcp(socket_tcp, buf_send, packet_len, 0);
 		
 		Packet_free(&(idp->header));
 		free(idp);
 		
-		printf("%s...Sent %d bytes.\n", TCP, bytes_sent);
+		printf("%s...Sent %d bytes.\n", TCP, ret);
 		return 1;
 	}
 	
@@ -159,14 +152,7 @@ int tcp_packet_handler(int tcp_socket_desc, int id, char* buf, Image* surface_el
 		
 		char buf_send[BUFFERSIZE];
 		int packet_len = Packet_serialize(buf_send, &(imp->header));
-		int bytes_sent = 0, ret;
-		while(bytes_sent < packet_len){
-			ret = send(tcp_socket_desc, buf_send + bytes_sent, packt_len - bytes_sent,0);
-			if (ret == -1 && errno == EINTR) continue;
-			ERROR_HELPER(ret, "Error in texture request.\n");
-			if (ret == 0) break;
-			bytes_sent += ret;
-		}
+		
 
 		Packet_free(&(text_send->header));
 		free(text_send);
@@ -186,15 +172,9 @@ int tcp_packet_handler(int tcp_socket_desc, int id, char* buf, Image* surface_el
 		elev->id = id;
 		elev->image = surface_elevation;
 		
-		int bytes_sent = 0, ret;
-		int packet_len = Packet_serialize(buf_send, &(elev->header));
-        while(bytes_sent < packet_len){
-			ret = send(tcp_socket_desc, buf_send + bytes_sent, packet_len - bytes_sent,0);
-			if (ret == -1 && errno == EINTR) continue;
-			ERROR_HELPER(ret, "Error in elevation request.\n");
-			if (ret == 0) break;
-			bytes_sent += ret;
-		}
+		size_t packet_len = Packet_serialize(buf_send, &(elev->header));
+		
+        int ret = send_tcp(socket_tcp, buf_send, packet_len, 0);
 
 		Packet_free(&(elev->header));
 		free(elev);
@@ -245,18 +225,14 @@ void* client_thread_handler(void* args){
 	clientList_print(users);
 	sem_post(sem_user);
 	
-	int msg_len = 0, ret;
+	int ret;
 	char buf_recv[BUFFERSIZE];
-	int ph_len = sizeof(PacketHeader);
+	size_t ph_len = sizeof(PacketHeader);
 	
 	while(communicate){
 		//Receiving packet
-		while(msg_len < ph_len){
-			ret = recv(client_desc, buf_recv + msg_len, ph_len - msg_len, 0);
-			if(ret == -1 && errno == EINTR) continue;
-			ERROR_HELPER(ret, "Error in receiving data in tcp.\n");
-			msg_len += ret;
-		}
+		ret = receive_tcp(socket_tcp, buf_recv, ph_len, 0);
+		if(ret == -2) printf("Error in connection between server and a client on socket %d.\n", socket_tcp);
 		
 		PacketHeader* header = (PacketHeader*) buf_recv;
 		int size = header->size - ph_len;
@@ -476,60 +452,21 @@ int main(int argc, char **argv) {
   
   printf("%s...Freeing resources.\n", SERVER);
     
-    //Destroy client list and pthread sem
-    pthread_mutex_lock(&mutex);
-    clientList_destroy(users);
-    pthread_mutex_unlock(&mutex);
-	pthread_mutex_destroy(&mutex);
-    //Close descriptors
-    ret = close(socket_tcp);
-    ERROR_HELPER(ret,"Failed closing server_tcp socket");
-    ret = close(socket_udp);
-    ERROR_HELPER(ret,"Failed closing server_udp socket");
-    Image_free(vehicle_texture);
-    Image_free(surface_elevation);
-	Image_free(surface_texture);
+  //Destroy client list and pthread sem
+  pthread_mutex_lock(&mutex);
+  clientList_destroy(users);
+  pthread_mutex_unlock(&mutex);
+  pthread_mutex_destroy(&mutex);
+  //Close descriptors
+  ret = close(socket_tcp);
+  ERROR_HELPER(ret,"Failed closing server_tcp socket");
+  ret = close(socket_udp);
+  ERROR_HELPER(ret,"Failed closing server_udp socket");
+  Image_free(vehicle_texture);
+  Image_free(surface_elevation);
+  Image_free(surface_texture);
 	
-	World_destroy(&world);
-
-
-  // not needed here
-  //   // construct the world
-  // World_init(&world, surface_elevation, surface_texture,  0.5, 0.5, 0.5);
-
-  // // create a vehicle
-  // vehicle=(Vehicle*) malloc(sizeof(Vehicle));
-  // Vehicle_init(vehicle, &world, 0, vehicle_texture);
-
-  // // add it to the world
-  // World_addVehicle(&world, vehicle);
-
-
-  
-  // // initialize GL
-  // glutInit(&argc, argv);
-  // glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
-  // glutCreateWindow("main");
-
-  // // set the callbacks
-  // glutDisplayFunc(display);
-  // glutIdleFunc(idle);
-  // glutSpecialFunc(specialInput);
-  // glutKeyboardFunc(keyPressed);
-  // glutReshapeFunc(reshape);
-  
-  // WorldViewer_init(&viewer, &world, vehicle);
-
-  
-  // // run the main GL loop
-  // glutMainLoop();
-
-  // // check out the images not needed anymore
-  // Image_free(vehicle_texture);
-  // Image_free(surface_texture);
-  // Image_free(surface_elevation);
-
-  // // cleanup
-  // World_destroy(&world);
-  return 0;             
+  World_destroy(&world);
+	
+  exit(EXIT_SUCCESS);          
 }
