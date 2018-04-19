@@ -26,78 +26,6 @@ Vehicle* vehicle; // The vehicle
 
 int ret, my_id;
 
-void keyPressed(unsigned char key, int x, int y)
-{
-  switch(key){
-  case 27:
-    glutDestroyWindow(window);
-    exit(0);
-  case ' ':
-    vehicle->translational_force_update = 0;
-    vehicle->rotational_force_update = 0;
-    break;
-  case '+':
-    viewer.zoom *= 1.1f;
-    break;
-  case '-':
-    viewer.zoom /= 1.1f;
-    break;
-  case '1':
-    viewer.view_type = Inside;
-    break;
-  case '2':
-    viewer.view_type = Outside;
-    break;
-  case '3':
-    viewer.view_type = Global;
-    break;
-  }
-}
-
-
-void specialInput(int key, int x, int y) {
-  switch(key){
-  case GLUT_KEY_UP:
-    vehicle->translational_force_update += 0.1;
-    break;
-  case GLUT_KEY_DOWN:
-    vehicle->translational_force_update -= 0.1;
-    break;
-  case GLUT_KEY_LEFT:
-    vehicle->rotational_force_update += 0.1;
-    break;
-  case GLUT_KEY_RIGHT:
-    vehicle->rotational_force_update -= 0.1;
-    break;
-  case GLUT_KEY_PAGE_UP:
-    viewer.camera_z+=0.1;
-    break;
-  case GLUT_KEY_PAGE_DOWN:
-    viewer.camera_z-=0.1;
-    break;
-  }
-}
-
-
-void display(void) {
-  WorldViewer_draw(&viewer);
-}
-
-
-void reshape(int width, int height) {
-  WorldViewer_reshapeViewport(&viewer, width, height);
-}
-
-void idle(void) {
-  World_update(&world);
-  usleep(30000);
-  glutPostRedisplay();
-  
-  // decay the commands
-  vehicle->translational_force_update *= 0.999;
-  vehicle->rotational_force_update *= 0.7;
-}
-
 int main(int argc, char **argv) {
 
   char *ip_address, *vehicle_texture; //From argv, default LOCALHOST and VEHICLE
@@ -149,7 +77,7 @@ int main(int argc, char **argv) {
 
   //TCP socket
   int socket_tcp;
-  struct sockaddr_in server_addr_tcp{0};
+  struct sockaddr_in server_addr_tcp = {0};
 
   socket_tcp = socket(AF_INET, SOCK_STREAM, 0);
   ERROR_HELPER(socket_tcp, "Error while creating socket_tcp");
@@ -158,12 +86,12 @@ int main(int argc, char **argv) {
   server_addr_tcp.sin_family = AF_INET;
   server_addr_tcp.sin_port = htons(TCP_PORT); //TCP port is defined in common.h
 
-  ret = connect(socket_tcp, (struct sockaddr*) &server_addr, sizeof(struct sockaddr_in));
+  ret = connect(socket_tcp, (struct sockaddr*) &server_addr_tcp, sizeof(struct sockaddr_in));
   ERROR_HELPER(socket_tcp, "Error while connecting on socket_tcp");
 
   //UDP socket
   int socket_udp;
-  struct sockaddr_in server_addr_udp{0};
+  struct sockaddr_in server_addr_udp = {0};
 
   socket_udp = socket(AF_INET, SOCK_DGRAM, 0);
   ERROR_HELPER(socket_udp, "Error while creating socket_udp");
@@ -187,7 +115,11 @@ int main(int argc, char **argv) {
   char elevation_map[BUFFERSIZE];
   size_t elevation_rq_len = Packet_serialize(elevation_rq_server, &(elevation_rq ->header));
 
-  ret = send_tcp(socket_tcp, elevation_rq_server,)
+  ret = send_tcp(socket_tcp, elevation_rq_server, elevation_rq_len, 0);
+  ERROR_HELPER(ret, "Error while sending my texture for server");
+
+  ret = receive_tcp(socket_tcp, elevation_map, sizeof(ImagePacket), 0);
+  ERROR_HELPER(ret, "Error while receiving elevation map from server");
 
   // construct the world
   World_init(&world, map_elevation, map_texture, 0.5, 0.5, 0.5);
