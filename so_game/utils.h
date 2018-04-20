@@ -13,14 +13,19 @@ typedef struct udp_args{
     Image* vehicle_texture;
 }udp_args;
 
-typedef struct client_args{
-    int socket_tcp;                   //Socket descriptor for TCP comunication
-    int socket_udp;                   //Socket descriptor for UDP comunication
-    int id;                           //ID received from server
-    Vehicle v;                        //Client's vehicle
-    Image* map_texture;               //Map texture
-    struct sockaddr_in server_addr;
-}client_args;
+typedef struct client_args {
+  localWorld* local_world;
+  struct sockaddr_in server_addr_udp;
+  int socket_udp;
+  int socket_tcp;
+} client_args;
+
+typedef struct localWorld {
+  int ids[WORLDSIZE];
+  int users_online;
+  char has_vehicle[WORLDSIZE];
+  Vehicle** vehicles;
+} localWorld;
 
 //TCP receive function
 int receive_tcp(int socket, void *buffer, size_t length, int flags);
@@ -33,3 +38,6 @@ int receive_udp(int socket, void *buffer, size_t length, int flags, struct socka
 
 //UDP send function
 int send_udp(int socket, const void *buffer, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t addrlen);
+
+//Has user
+int hasUser(int ids[], int size, int id);
