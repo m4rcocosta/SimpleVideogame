@@ -16,6 +16,7 @@
 #include "vehicle.h"
 #include "world_viewer.h"
 #include "so_game_protocol.h"
+#include "world_viewer.c"
 #include "utils.h"
 #include "common.h"
 
@@ -25,6 +26,30 @@ World world;
 Vehicle* vehicle; // The vehicle
 
 int ret, id;
+char connected = 1, communicating = 1;
+
+int sendUpdates(int socket_udp, struct sockaddr_in server_addr, int serverlength) {
+  return 0;
+}
+
+// Send VehicleUpdatePacket to server
+void* send_UDP(void* args) {
+  client_args udp_args = *(client_args*)args;
+  struct sockaddr_in server_addr = udp_args.server_addr_udp;
+  int socket_udp = udp_args.socket_udp;
+  int server_length = sizeof(server_addr);
+  while (connected && communicating) {
+    int ret = sendUpdates(socket_udp, server_addr, server_length);
+    if (ret == -1)
+      printf("[UDP_Sender] Cannot send VehicleUpdatePacket \n");
+  }
+  pthread_exit(NULL);
+}
+
+// Receive and apply WorldUpdatePacket from server
+void* receive_UDP(void* args) {
+  return NULL;
+}
 
 int main(int argc, char **argv) {
 
@@ -103,11 +128,11 @@ int main(int argc, char **argv) {
   id = getID(socket_tcp);
   local_world->ids[0] = id;
   printf("%sID number %d received.\n", CLIENT, id);
-  Image* map_elevation = getElevationMap(socket_tcp);
-  printf(stdout, "%sMap elevation received.\n", CLIENT);
-  Image* map_texture = getTextureMap(socket_tcp);
+  map_elevation = getElevationMap(socket_tcp);
+  printf("%sMap elevation received.\n", CLIENT);
+  map_texture = getTextureMap(socket_tcp);
   printf("%sMap texture received.\n", CLIENT);
-  print("%sSending vehicle texture...\n", CLIENT);
+  printf("%sSending vehicle texture...\n", CLIENT);
   sendVehicleTexture(socket_tcp, my_texture, id);
   printf("%sClient Vehicle texture sent.\n", CLIENT);
 
@@ -141,12 +166,12 @@ int main(int argc, char **argv) {
   pthread_t sender_udp, receiver_udp;
   client_args udp_args;
   udp_args.socket_tcp = socket_tcp;
-  udp_args.server_addr_udp = udp_server;
+  udp_args.server_addr_udp = server_addr_udp;
   udp_args.socket_udp = socket_udp;
   udp_args.local_world = local_world;
-  ret = pthread_create(&sender_udp, NULL, UDPSender, &udp_args);
+  ret = pthread_create(&sender_udp, NULL, send_UDP, &udp_args);
   PTHREAD_ERROR_HELPER(ret, "[CLIENT] Error while creating thread sender_udp.\n");
-  ret = pthread_create(&receiver_udp, NULL, UDPReceiver, &udp_args);
+  ret = pthread_create(&receiver_udp, NULL, receive_UDP, &udp_args);
   PTHREAD_ERROR_HELPER(ret, "[CLIENT] Error while creating thread receiver_udp.\n");
 
   // Disconnect
