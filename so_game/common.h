@@ -8,6 +8,7 @@
 #define TCP_PORT 	              2048
 #define UDP_PORT                  2801
 #define BUFFERSIZE              1000000
+#define WORLDSIZE                 512
 #define LOCALHOST            "127.0.0.1"
 #define VEHICLE              "images/arrow-right.ppm"
 #define MAP_ELEVATION        "images/maze.ppm"
