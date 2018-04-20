@@ -103,3 +103,13 @@ int send_udp(int socket, const void *buffer, size_t length, int flags, const str
 	}
 	return bytes_sent;
 }
+
+//Has user
+int hasUser(int ids[], int size, int id) {
+  for (int i = 0; i < size; i++) {
+    if (ids[i] == id) {
+      return i;
+    }
+  }
+  return -1;
+}
