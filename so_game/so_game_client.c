@@ -25,23 +25,6 @@ World world;
 Vehicle* vehicle; // The vehicle
 
 int ret, id;
-char connected = 1, communicating = 1;
-
-void handleSignal(int signal) {
-  // Find out which signal we're handling
-  switch (signal) {
-    case SIGHUP:
-      break;
-    case SIGINT:
-      connected = 0;
-      communicating = 0;
-      WorldViewer_exit(0);
-      break;
-    default:
-      fprintf(stderr, "Caught wrong signal: %d\n", signal);
-      return;
-  }
-}
 
 int main(int argc, char **argv) {
 
@@ -84,10 +67,10 @@ int main(int argc, char **argv) {
   //   -get an elevation map
   //   -get the texture of the surface
 
-  // these come from the server
+  // these come from the server      //UNUSED
   Image* map_elevation;
   Image* map_texture;
-  //Image* my_texture_from_server;
+  //Image* my_texture_from_server;   //UNUSED
 
   /* MY CODE */
 
@@ -107,7 +90,7 @@ int main(int argc, char **argv) {
 
   printf("%sTCP connection established...\n", CLIENT);
 
-  // setting up localWorld
+  // Setting up localWorld
   localWorld* local_world = (localWorld*)malloc(sizeof(localWorld));
   local_world->vehicles = (Vehicle**)malloc(sizeof(Vehicle*) * WORLDSIZE);
   for (int i = 0; i < WORLDSIZE; i++) {
@@ -115,7 +98,7 @@ int main(int argc, char **argv) {
     local_world->has_vehicle[i] = 0;
   }
 
-  // Talk with server
+  // Communicating with server
   printf("%sStarting ID,map_elevation,map_texture requests.\n", CLIENT);
   id = getID(socket_tcp);
   local_world->ids[0] = id;
