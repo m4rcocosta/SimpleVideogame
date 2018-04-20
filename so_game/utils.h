@@ -1,4 +1,5 @@
 #include "clientList.h"
+#include "common.h"
 
 typedef struct tcp_args{
 	int client_desc;
@@ -13,19 +14,19 @@ typedef struct udp_args{
     Image* vehicle_texture;
 }udp_args;
 
-typedef struct client_args {
-  localWorld* local_world;
-  struct sockaddr_in server_addr_udp;
-  int socket_udp;
-  int socket_tcp;
-} client_args;
-
 typedef struct localWorld {
   int ids[WORLDSIZE];
   int users_online;
   char has_vehicle[WORLDSIZE];
   Vehicle** vehicles;
 } localWorld;
+
+typedef struct client_args {
+  localWorld* local_world;
+  struct sockaddr_in server_addr_udp;
+  int socket_udp;
+  int socket_tcp;
+} client_args;
 
 //TCP receive function
 int receive_tcp(int socket, void *buffer, size_t length, int flags);
@@ -41,3 +42,6 @@ int send_udp(int socket, const void *buffer, size_t length, int flags, const str
 
 //Has user
 int hasUser(int ids[], int size, int id);
+
+//Add user
+int addUser(int ids[], int size, int id2, int* position, int* users_online);
