@@ -40,7 +40,7 @@ int send_updates(int socket_udp, struct sockaddr_in server_addr, int serverlengt
   // Sem
   vup->id = id;
   int size = Packet_serialize(buf_send, &vup->header);
-  int bytes_sent = sendto(socket_udp, buf_send, size, 0, (const struct sockaddr*)&server_addr, (socklen_t)serverlen);
+  int bytes_sent = sendto(socket_udp, buf_send, size, 0, (const struct sockaddr*)&server_addr, (socklen_t)serverlength);
   printf("%sSent a VehicleUpdatePacket of %d bytes with tf:%f rf:%f \n", CLIENT, bytes_sent, vup->translational_force, vup->rotational_force);
   Packet_free(&(vup->header));
   if (bytes_sent < 0) return -1;
@@ -54,7 +54,7 @@ void* send_UDP(void* args) {
   int socket_udp = udp_args.socket_udp;
   int server_length = sizeof(server_addr);
   while (connected && communicating) {
-    int ret = sendUpdates(socket_udp, server_addr, server_length);
+    int ret = send_updates(socket_udp, server_addr, server_length);
     if (ret == -1)
       printf("%sCannot send VehicleUpdatePacket.\n", CLIENT);
   }
