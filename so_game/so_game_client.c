@@ -28,7 +28,22 @@ Vehicle* vehicle; // The vehicle
 int ret, id;
 char connected = 1, communicating = 1;
 
-int sendUpdates(int socket_udp, struct sockaddr_in server_addr, int serverlength) {
+int send_updates(int socket_udp, struct sockaddr_in server_addr, int serverlength) {
+  char buf_send[BUFFERSIZE];
+  PacketHeader ph;
+  ph.type = VehicleUpdate;
+  VehicleUpdatePacket* vup = (VehicleUpdatePacket*)malloc(sizeof(VehicleUpdatePacket));
+  vup->header = ph;
+  // Sem
+  Vehicle_getForcesUpdate(vehicle, &(vup->translational_force), &(vup->rotational_force));
+  Vehicle_getXYTheta(vehicle, &(vup->x), &(vup->y), &(vup->theta));
+  // Sem
+  vup->id = id;
+  int size = Packet_serialize(buf_send, &vup->header);
+  int bytes_sent = sendto(socket_udp, buf_send, size, 0, (const struct sockaddr*)&server_addr, (socklen_t)serverlen);
+  printf("%sSent a VehicleUpdatePacket of %d bytes with tf:%f rf:%f \n", CLIENT, bytes_sent, vup->translational_force, vup->rotational_force);
+  Packet_free(&(vup->header));
+  if (bytes_sent < 0) return -1;
   return 0;
 }
 
@@ -41,7 +56,7 @@ void* send_UDP(void* args) {
   while (connected && communicating) {
     int ret = sendUpdates(socket_udp, server_addr, server_length);
     if (ret == -1)
-      printf("[UDP_Sender] Cannot send VehicleUpdatePacket \n");
+      printf("%sCannot send VehicleUpdatePacket.\n", CLIENT);
   }
   pthread_exit(NULL);
 }
@@ -125,23 +140,25 @@ int main(int argc, char **argv) {
 
   // Communicating with server
   printf("%sStarting ID,map_elevation,map_texture requests.\n", CLIENT);
-  id = getID(socket_tcp);
+  id = get_ID(socket_tcp);
   local_world->ids[0] = id;
   printf("%sID number %d received.\n", CLIENT, id);
-  map_elevation = getElevationMap(socket_tcp);
+  map_elevation = get_Elevation_Map(socket_tcp);
   printf("%sMap elevation received.\n", CLIENT);
-  map_texture = getTextureMap(socket_tcp);
+  map_texture = get_Texture_Map(socket_tcp);
   printf("%sMap texture received.\n", CLIENT);
   printf("%sSending vehicle texture...\n", CLIENT);
-  sendVehicleTexture(socket_tcp, my_texture, id);
+  send_Vehicle_Texture(socket_tcp, my_texture, id);
   printf("%sClient Vehicle texture sent.\n", CLIENT);
 
 
   // construct the world
   World_init(&world, map_elevation, map_texture, 0.5, 0.5, 0.5);
-  vehicle=(Vehicle*) malloc(sizeof(Vehicle));
-  Vehicle_init(&vehicle, &world, id, my_texture);
+  vehicle = (Vehicle*)malloc(sizeof(Vehicle));
+  Vehicle_init(vehicle, &world, id, my_texture);
   World_addVehicle(&world, vehicle);
+  local_world->vehicles[0] = vehicle;
+  local_world->has_vehicle[0] = 1;
 
   // UDP socket
   int socket_udp;
