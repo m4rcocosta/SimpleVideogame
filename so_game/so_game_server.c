@@ -175,6 +175,7 @@ int tcp_packet_handler(int tcp_socket_desc, int id, char* buf, Image* surface_el
 	else if(header->type == GetTexture){
 		ImagePacket* imp = (ImagePacket*) buf;
 		int id = imp->id;
+		char buf_send[BUFFERSIZE];
 		
 		//header for the answer
 		PacketHeader ph;
@@ -182,13 +183,24 @@ int tcp_packet_handler(int tcp_socket_desc, int id, char* buf, Image* surface_el
 		
 		//packet to send texture to client
 		ImagePacket* text_send = (ImagePacket*)malloc(sizeof(ImagePacket));
+		
+		sem_wait(sem_user);
+		ClientListElement* elem = clientList_find(users, id);
+		if(elem == NULL) break;
+		sem_post(sem_user);
+		
 		text_send->header = ph;
 		text_send->id = id;
 		text_send->image = elevation_texture;
 		
-		char buf_send[BUFFERSIZE];
-		int packet_len = Packet_serialize(buf_send, &(imp->header));
+		sem_wait(sem_user);
+		ClientListElement* elem = clientList_find(users, id);
+		if(elem == NULL) break;
+		sem_post(sem_user);
 		
+		int packet_len = Packet_serialize(buf_send, &(imp->header));
+		int ret = send_tcp(socket_tcp, buf_send, packet_len, 0);
+		ERROR_HELPER(ret, "Error in tcp PostTexture sender.\n");
 
 		Packet_free(&(text_send->header));
 		free(text_send);
