@@ -45,3 +45,18 @@ int hasUser(int ids[], int size, int id);
 
 //Add user
 int addUser(int ids[], int size, int id2, int* position, int* users_online);
+
+// Get ID
+int get_ID(int socket);
+
+// Get Elevation Map
+Image* get_Elevation_Map(int socket);
+
+// Get Texture Map
+Image* get_Texture_Map(int socket);
+
+// Send Vehicle Texture
+int send_Vehicle_Texture(int socket, Image *texture, int id);
+
+// Get Vehicle Texture
+Image* get_Vehicle_Texture(int socket, int id);
