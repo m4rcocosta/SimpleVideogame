@@ -4,8 +4,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#include <netinet/in.h>   // struct sockaddr_in
+#include <arpa/inet.h>    // htons() and inet_addr()
 #include <pthread.h>
 #include <sys/socket.h>
 #include <signal.h>
@@ -28,6 +28,18 @@ Vehicle* vehicle; // The vehicle
 int ret, id;
 char connected = 1, communicating = 1;
 
+// Handle Signal
+void handle_signal(int signal) {
+  if(signal == SIGHUP) break;
+  else if(signal == SIGINT) {
+    connected = 0;
+    communicating = 0;
+    WorldViewer_exit(0);
+  }
+  else printf("%sUnknown signal.\n", CLIENT);
+}
+
+// Send Vehicle Updates
 int send_updates(int socket_udp, struct sockaddr_in server_addr, int serverlength) {
   char buf_send[BUFFERSIZE];
   PacketHeader ph;
@@ -35,8 +47,13 @@ int send_updates(int socket_udp, struct sockaddr_in server_addr, int serverlengt
   VehicleUpdatePacket* vup = (VehicleUpdatePacket*)malloc(sizeof(VehicleUpdatePacket));
   vup->header = ph;
   // Sem
-  Vehicle_getForcesUpdate(vehicle, &(vup->translational_force), &(vup->rotational_force));
-  Vehicle_getXYTheta(vehicle, &(vup->x), &(vup->y), &(vup->theta));
+  // Get Forces Update
+  vup->translational_force = vehicle->translational_force_update;
+  vup->rotational_force = vehicle->rotational_force_update;
+  // Get X, Y, Theta
+  vup->x = vehicle->x;
+  vup->y = vehicle->y;
+  vup->theta = vehicle->theta;
   // Sem
   vup->id = id;
   int size = Packet_serialize(buf_send, &vup->header);
@@ -63,7 +80,14 @@ void* send_UDP(void* args) {
 
 // Receive and apply WorldUpdatePacket from server
 void* receive_UDP(void* args) {
-  return NULL;
+  client_args udp_args = *(client_args*)args;
+  struct sockaddr_in server_addr = udp_args.server_addr_udp;
+  int socket_udp = udp_args.socket_udp;
+  socklen_t addrlen = sizeof(server_addr);
+  localWorld* lw = udp_args.local_world;
+  int socket_tcp = udp_args.socket_tcp;
+  
+  pthread_exit(NULL);
 }
 
 int main(int argc, char **argv) {
@@ -100,14 +124,14 @@ int main(int argc, char **argv) {
   }
   printf("%sStarting... \n", CLIENT);
   
-  //Image* my_texture_for_server;
+  //Image* my_texture_for_server;      //UNUSED
   // todo: connect to the server
   //   -get ad id
   //   -send your texture to the server (so that all can see you)
   //   -get an elevation map
   //   -get the texture of the surface
 
-  // these come from the server      //UNUSED
+  // these come from the server
   Image* map_elevation;
   Image* map_texture;
   //Image* my_texture_from_server;   //UNUSED
@@ -151,6 +175,17 @@ int main(int argc, char **argv) {
   send_Vehicle_Texture(socket_tcp, my_texture, id);
   printf("%sClient Vehicle texture sent.\n", CLIENT);
 
+  // Signal handlers
+  struct sigaction sa;
+  sa.sa_handler = handle_signal;
+  // Restart the system call, if at all possible
+  sa.sa_flags = SA_RESTART;
+  // Block every signal during the handler
+  sigfillset(&sa.sa_mask);
+  ret = sigaction(SIGHUP, &sa, NULL);
+  ERROR_HELPER(ret, "Error: cannot handle SIGHUP.\n");
+  ret = sigaction(SIGINT, &sa, NULL);
+  ERROR_HELPER(ret, "Error: cannot handle SIGINT.\n");
 
   // construct the world
   World_init(&world, map_elevation, map_texture, 0.5, 0.5, 0.5);
@@ -205,7 +240,7 @@ int main(int argc, char **argv) {
   ret = close(socket_udp);
   ERROR_HELPER(ret, "[Client] Error while closung UDP socket.\n");
 
-  printf("%sCleaning up... \n", CLIENT);
+  printf("%sCleaning up...\n", CLIENT);
 
   // Clean resources
   for (int i = 0; i < WORLDSIZE; i++) {
