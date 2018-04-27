@@ -89,7 +89,15 @@ void* receive_UDP(void* args) {
   while (connected && communicating) {
     char receive_buffer[BUFFERSIZE];
     int bytes_read = recvfrom(socket_udp, receive_buffer, BUFFERSIZE, 0, (struct sockaddr*)&server_addr, &addrlen);
-    if(bytes_read == -1) printf("%sError while receiving from UDP.\n", CLIENT);
+    if(bytes_read == -1) {
+      printf("%sError while receiving from UDP.\n", CLIENT);
+      usleep(500000);
+      continue;
+    }
+    if(bytes_read == 0) {
+      usleep(500000);
+      continue;
+    }
     printf("%sReceived %d bytes from UDP.\n", CLIENT, bytes_read);
     PacketHeader* ph = (PacketHeader*) receive_buffer;
     if(ph->size != bytes_read) ERROR_HELPER(-1, "Error: partial UDP read!\n");
@@ -99,6 +107,42 @@ void* receive_UDP(void* args) {
       for(int i = 0; i < wup->num_vehicles; i++) {
         int new_position = -1;
         int id_struct = addUser(lw->ids,WORLDSIZE,wup->updates[i].id, &new_position, &(lw->users_online));
+        if(wup->updates[i].id == id) continue;
+        else if(id_struct == -1) {
+          if(new_position == -1) continue;
+          Image* img = getVehicleTexture(socket_tcp, wup->updates[i].id);
+          if(img == NULL) continue;
+          Vehicle* new_vehicle = (vehicle*)malloc(sizeof(vehicle));
+          Vehicle_init(new_vehicle, &world, wup->updates[i].id, img);
+          lw->vehicles[new_position] = new_vehicle;
+          // Sem
+          // Set Forces Update
+          lw->vehicles[new_position]->translational_force = lwup->updates[i].translational_force;
+          lw->vehicles[new_position]->rotational_force = wup->updates[i].rotational_force;
+          // Set X, Y, Theta
+          lw->vehicles[new_position]->x = wup->updates[i].x;
+          lw->vehicles[new_position]->y = wup->updates[i].y;
+          lw->vehicles[new_position]->theta = wup->updates[i].theta;
+          // Sem
+          World_addVehicle(&world, new_vehicle);
+          World_update(&world);
+          lw->has_vehicle[new_position] = 1;
+        }
+        else {
+          if(lw->has_vehicle)
+          printf("%sUpdating Vehicle with id %d.\n", CLIENT, wup->updates[i].id);
+          //Sem
+          // Set X, Y, Theta
+          lw->vehicles[id_struct]->x = wup->updates[i].x;
+          lw->vehicles[id_struct]->y = wup->updates[i].y;
+          lw->vehicles[id_struct]->theta = wup->updates[i].theta;
+          // Set Forces Update
+          lw->vehicles[id_struct]->translational_force = lwup->updates[i].translational_force;
+          lw->vehicles[id_struct]->rotational_force = wup->updates[i].rotational_force;
+          World_update(&world);
+          //Sem 
+
+        }
       }
     }
     else {
