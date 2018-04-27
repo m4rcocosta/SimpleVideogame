@@ -30,11 +30,11 @@ char connected = 1, communicating = 1;
 
 // Handle Signal
 void handle_signal(int signal) {
-  if(signal == SIGHUP) break;
-  else if(signal == SIGINT) {
+  // if(signal == SIGHUP);
+  if(signal == SIGINT) {
     connected = 0;
     communicating = 0;
-    WorldViewer_exit(0);
+    exit(0);
   }
   else printf("%sUnknown signal.\n", CLIENT);
 }
@@ -110,14 +110,14 @@ void* receive_UDP(void* args) {
         if(wup->updates[i].id == id) continue;
         else if(id_struct == -1) {
           if(new_position == -1) continue;
-          Image* img = getVehicleTexture(socket_tcp, wup->updates[i].id);
+          Image* img = get_Vehicle_Texture(socket_tcp, wup->updates[i].id);
           if(img == NULL) continue;
-          Vehicle* new_vehicle = (vehicle*)malloc(sizeof(vehicle));
+          Vehicle* new_vehicle = (Vehicle*)malloc(sizeof(vehicle));
           Vehicle_init(new_vehicle, &world, wup->updates[i].id, img);
           lw->vehicles[new_position] = new_vehicle;
           // Sem
           // Set Forces Update
-          lw->vehicles[new_position]->translational_force = lwup->updates[i].translational_force;
+          lw->vehicles[new_position]->translational_force = wup->updates[i].translational_force;
           lw->vehicles[new_position]->rotational_force = wup->updates[i].rotational_force;
           // Set X, Y, Theta
           lw->vehicles[new_position]->x = wup->updates[i].x;
@@ -137,7 +137,7 @@ void* receive_UDP(void* args) {
           lw->vehicles[id_struct]->y = wup->updates[i].y;
           lw->vehicles[id_struct]->theta = wup->updates[i].theta;
           // Set Forces Update
-          lw->vehicles[id_struct]->translational_force = lwup->updates[i].translational_force;
+          lw->vehicles[id_struct]->translational_force = wup->updates[i].translational_force;
           lw->vehicles[id_struct]->rotational_force = wup->updates[i].rotational_force;
           World_update(&world);
           //Sem 
@@ -146,10 +146,10 @@ void* receive_UDP(void* args) {
       }
     }
     else {
-      printf("%sError: received unknown packet.\n");
+      printf("%sError: received unknown packet.\n", CLIENT);
       connected = 0;
       communicating = 0;
-      WorldViewer_exit(-1);
+      exit(-1);
     }
   }
   
