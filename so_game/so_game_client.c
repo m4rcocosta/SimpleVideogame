@@ -86,6 +86,28 @@ void* receive_UDP(void* args) {
   socklen_t addrlen = sizeof(server_addr);
   localWorld* lw = udp_args.local_world;
   int socket_tcp = udp_args.socket_tcp;
+  while (connected && communicating) {
+    char receive_buffer[BUFFERSIZE];
+    int bytes_read = recvfrom(socket_udp, receive_buffer, BUFFERSIZE, 0, (struct sockaddr*)&server_addr, &addrlen);
+    if(bytes_read == -1) printf("%sError while receiving from UDP.\n", CLIENT);
+    printf("%sReceived %d bytes from UDP.\n", CLIENT, bytes_read);
+    PacketHeader* ph = (PacketHeader*) receive_buffer;
+    if(ph->size != bytes_read) ERROR_HELPER(-1, "Error: partial UDP read!\n");
+    if(ph->type == WorldUpdate) {
+      WorldUpdatePacket* wup = (WorldUpdatePacket*) Packet_deserialize(receive_buffer, bytes_read);
+      float x, y, theta;
+      for(int i = 0; i < wup->num_vehicles; i++) {
+        int new_position = -1;
+        int id_struct = addUser(lw->ids,WORLDSIZE,wup->updates[i].id, &new_position, &(lw->users_online));
+      }
+    }
+    else {
+      printf("%sError: received unknown packet.\n");
+      connected = 0;
+      communicating = 0;
+      WorldViewer_exit(-1);
+    }
+  }
   
   pthread_exit(NULL);
 }
