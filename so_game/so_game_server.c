@@ -164,6 +164,7 @@ int tcp_packet_handler(int tcp_socket_desc, int id, char* buf, Image* surface_el
 		
 		//send the packet via socket
 		int ret = send_tcp(socket_tcp, buf_send, packet_len, 0);
+		ERROR_HELPER(ret, "Error in tcp sender.\n");
 		
 		Packet_free(&(idp->header));
 		free(idp);
@@ -186,17 +187,12 @@ int tcp_packet_handler(int tcp_socket_desc, int id, char* buf, Image* surface_el
 		
 		sem_wait(sem_user);
 		ClientListElement* elem = clientList_find(users, id);
-		if(elem == NULL) break;
+		if(elem == NULL) return -1;
 		sem_post(sem_user);
 		
 		text_send->header = ph;
 		text_send->id = id;
 		text_send->image = elevation_texture;
-		
-		sem_wait(sem_user);
-		ClientListElement* elem = clientList_find(users, id);
-		if(elem == NULL) break;
-		sem_post(sem_user);
 		
 		int packet_len = Packet_serialize(buf_send, &(imp->header));
 		int ret = send_tcp(socket_tcp, buf_send, packet_len, 0);
@@ -224,6 +220,7 @@ int tcp_packet_handler(int tcp_socket_desc, int id, char* buf, Image* surface_el
 		size_t packet_len = Packet_serialize(buf_send, &(elev->header));
 		
         int ret = send_tcp(socket_tcp, buf_send, packet_len, 0);
+        ERROR_HELPER(ret, "Error in tcp sender.\n");
 
 		Packet_free(&(elev->header));
 		free(elev);
@@ -330,7 +327,6 @@ void* client_thread_handler(void* args){
 void* thread_server_tcp(void* args){
 	int ret;
 	tcp_args* tcp_arg = (tcp_args*) args;
-	int client_desc = tcp_arg->client_desc;
 	struct sockaddr_in client_addr = {0};
 	pthread_t client_thread;
 	
