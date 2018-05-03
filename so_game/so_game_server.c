@@ -80,9 +80,11 @@ void* udp_sender(void* args){
 		size_t packet_len = Packet_serialize(buf, &wup->header);
 		elem = users->first;
 		while(elem != NULL){
-			int ret = send_udp(socket_udp, buf, packet_len, 0, (struct sockaddr*) &elem->user_addr, sizeof(struct sockaddr_in));
-			ERROR_HELPER(ret, "Error in UDPSender.\n");
-			if(ret == -2) printf("Error in connection between server and client with id %d.\n", elem->id);
+			int	ret = sendto(socket_udp, buf, packet_len, 0, (struct sockaddr*) &elem->user_addr, sizeof(struct sockaddr_in));
+			if(ret == -1){
+				printf("%s...Error in udp_sender.\n", UDP);
+			}
+			
 			printf("%s...Sent WorldUpdate to %d client.\n", UDP, elem->id);
 			elem = elem->next;
 		}
@@ -138,10 +140,16 @@ void* udp_receiver(void* args){
 	while(communicate){
 		char buf[BUFFERSIZE];
 		struct sockaddr_in client_addr = {0};
-		int read = receive_udp(socket_udp, buf, BUFFERSIZE, 0, (struct sockaddr*) &client_addr, (socklen_t*) sizeof(struct sockaddr_in));
-		if(read == -2) printf("Error in connection between server and client on socket %d.\n", socket_udp); 
+		
+		int bytes_read = 0;
+		bytes_read = recvfrom(socket_udp, buf, BUFFERSIZE, 0, (struct sockaddr*)&client_addr, (socklen_t*)sizeof(struct sockaddr_in));
+		if(bytes_read == -1 || bytes_read == 0){
+			printf("%s...Error in udp receive, exit.\n", UDP);
+			pthread_exit(NULL);
+		}
+		
 		PacketHeader* ph = (PacketHeader*) buf;
-		if(ph->size != read) continue;
+		if(ph->size != bytes_read) continue;
 		int ret = udp_packet_handler(socket_udp, buf, client_addr);
 		if(ret == -1) printf("%s...Update of type VehicleUpdate didn't work.\n", UDP);
 	}
@@ -163,8 +171,14 @@ int tcp_packet_handler(int tcp_socket_desc, int id, char* buf, Image* surface_el
 		size_t packet_len = Packet_serialize(buf_send, &(idp->header));
 		
 		//send the packet via socket
-		int ret = send_tcp(socket_tcp, buf_send, packet_len, 0);
-		ERROR_HELPER(ret, "Error in tcp sender.\n");
+		int bytes_sent = 0, ret;
+		while(bytes_sent < packet_len){
+			ret = send(socket_tcp, buf_send + bytes_sent, packet_len - bytes_sent, 0);
+			if (ret == -1 && errno == EINTR) continue;
+			ERROR_HELPER(ret, "Error in elevation request.\n");
+			if (ret == 0) break;
+			bytes_sent += ret;
+		}
 		
 		Packet_free(&(idp->header));
 		free(idp);
@@ -195,9 +209,15 @@ int tcp_packet_handler(int tcp_socket_desc, int id, char* buf, Image* surface_el
 		text_send->image = elevation_texture;
 		
 		int packet_len = Packet_serialize(buf_send, &(imp->header));
-		int ret = send_tcp(socket_tcp, buf_send, packet_len, 0);
-		ERROR_HELPER(ret, "Error in tcp PostTexture sender.\n");
-
+		int bytes_sent = 0, ret;
+		while(bytes_sent < packet_len){
+			ret = send(socket_tcp, buf_send + bytes_sent, packet_len - bytes_sent, 0);
+			if (ret == -1 && errno == EINTR) continue;
+			ERROR_HELPER(ret, "Error in elevation request.\n");
+			if (ret == 0) break;
+			bytes_sent += ret;
+		}
+		
 		Packet_free(&(text_send->header));
 		free(text_send);
 		
@@ -219,8 +239,14 @@ int tcp_packet_handler(int tcp_socket_desc, int id, char* buf, Image* surface_el
 		
 		size_t packet_len = Packet_serialize(buf_send, &(elev->header));
 		
-        int ret = send_tcp(socket_tcp, buf_send, packet_len, 0);
-        ERROR_HELPER(ret, "Error in tcp sender.\n");
+        int bytes_sent = 0, ret;
+		while(bytes_sent < packet_len){
+			ret = send(socket_tcp, buf_send + bytes_sent, packet_len - bytes_sent, 0);
+			if (ret == -1 && errno == EINTR) continue;
+			ERROR_HELPER(ret, "Error in elevation request.\n");
+			if (ret == 0) break;
+			bytes_sent += ret;
+		}
 
 		Packet_free(&(elev->header));
 		free(elev);
@@ -277,8 +303,16 @@ void* client_thread_handler(void* args){
 	
 	while(communicate){
 		//Receiving packet
-		ret = receive_tcp(socket_tcp, buf_recv, ph_len, 0);
-		if(ret == -2) printf("Error in connection between server and a client on socket %d.\n", socket_tcp);
+		int bytes_read = 0;
+		while(bytes_read < ph_len) {
+			ret = recv(socket_tcp, buf_recv + bytes_read, ph_len, 0);
+			if (errno == EINTR) continue;
+			if (errno == ENOTCONN) {
+				printf("Connection closed.\n");
+				break;
+			}
+			bytes_read++;
+		}
 		
 		PacketHeader* header = (PacketHeader*) buf_recv;
 		int size = header->size - ph_len;

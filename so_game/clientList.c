@@ -1,4 +1,4 @@
-#include "client_list.h"
+#include "clientList.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,7 +25,7 @@ ClientListElement* clientList_add(ClientList* head, ClientListElement* elem) {
   if (head == NULL) return NULL;
   ClientListElement* user = head->first;
   elem->next = user;
-  head->first = item;
+  head->first = elem;
   head->size++;
   return elem;
 }
@@ -53,7 +53,7 @@ void clientList_destroy(ClientList* users) {
   if (users == NULL) return;
   ClientListElement* user = users->first;
   while (user != NULL) {
-    ClientListElement* tmp = ClientList_remove(users, user);
+    ClientListElement* tmp = clientList_remove(users, user);
     user = user->next;
     close(tmp->id);
     free(tmp);
