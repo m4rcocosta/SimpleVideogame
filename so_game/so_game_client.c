@@ -103,7 +103,6 @@ void* receive_UDP(void* args) {
     if(ph->size != bytes_read) ERROR_HELPER(-1, "Error: partial UDP read!\n");
     if(ph->type == WorldUpdate) {
       WorldUpdatePacket* wup = (WorldUpdatePacket*) Packet_deserialize(receive_buffer, bytes_read);
-      float x, y, theta;
       for(int i = 0; i < wup->num_vehicles; i++) {
         int new_position = -1;
         int id_struct = addUser(lw->ids,WORLDSIZE,wup->updates[i].id, &new_position, &(lw->users_online));
@@ -158,7 +157,7 @@ void* receive_UDP(void* args) {
 
 int main(int argc, char **argv) {
 
-  char *ip_address, *vehicle_texture; //From argv, default LOCALHOST and VEHICLE
+  char *ip_address = NULL, *vehicle_texture = NULL; //From argv, default LOCALHOST and VEHICLE
 
   if (argc == 1) {
     ip_address = LOCALHOST;
