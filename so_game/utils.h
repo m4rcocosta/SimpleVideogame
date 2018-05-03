@@ -1,5 +1,11 @@
 #include "clientList.h"
 #include "common.h"
+#include "image.h"
+#include "surface.h"
+#include "world.h"
+#include "vehicle.h"
+#include "world_viewer.h"
+#include "so_game_protocol.h"
 
 typedef struct tcp_args{
 	int client_desc;
@@ -27,18 +33,6 @@ typedef struct client_args {
   int socket_udp;
   int socket_tcp;
 } client_args;
-
-//TCP receive function
-int receive_tcp(int socket, void *buffer, size_t length, int flags);
-
-//TCP send function
-int send_tcp(int socket, const void *buffer, size_t length, int flags);
-
-//UDP receive function
-int receive_udp(int socket, void *buffer, size_t length, int flags, struct sockaddr *src_addr, socklen_t *addrlen);
-
-//UDP send function
-int send_udp(int socket, const void *buffer, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t addrlen);
 
 //Has user
 int hasUser(int ids[], int size, int id);

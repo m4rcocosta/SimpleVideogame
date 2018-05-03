@@ -1,8 +1,9 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-#include "image.h"
-#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include "errno.h"
 
 //Configuration parameters
 #define TCP_PORT 	              2048
