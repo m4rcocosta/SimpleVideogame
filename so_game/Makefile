@@ -17,6 +17,8 @@ OBJS = vec3.o\
        world.o\
        world_viewer.o\
        so_game_protocol.o\
+	   utils.o\
+	   clientList.o\
 	   so_game_server.o\
 	   so_game_client.o\
 
@@ -29,8 +31,9 @@ HEADERS=helpers.h\
 	vehicle.h\
 	world.h\
 	world_viewer.h\
-	common.h\
 	utils.h\
+	common.h\
+	clientList.h\
 
 %.o:	%.c $(HEADERS)
 	$(CC) $(CCOPTS) -c -o $@  $<
