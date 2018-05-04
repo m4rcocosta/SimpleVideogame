@@ -1,0 +1,5 @@
+*.o
+*.a
+so_game/so_game_client
+so_game/so_game_server
+so_game/test_packets_serialization
