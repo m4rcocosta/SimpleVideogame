@@ -23,7 +23,7 @@
 
 int accepted = 1, communicate = 1;
 ClientList* users;
-sem_t* sem_user;
+pthread_mutex_t sem_user = PTHREAD_MUTEX_INITIALIZER;
 int socket_tcp, socket_udp;		//network variables
 World world;
 
@@ -51,7 +51,7 @@ void* udp_sender(void* args){
 		ph.type = WorldUpdate;
 		WorldUpdatePacket* wup = (WorldUpdatePacket*)malloc(sizeof(WorldUpdatePacket));
 		wup->header = ph;
-		sem_wait(sem_user);
+		pthread_mutex_lock(&sem_user);
 		ClientListElement* elem = users->first;
 		int n = 0;
 		while(elem != NULL){
@@ -60,7 +60,7 @@ void* udp_sender(void* args){
 		}
 		if(n == 0){
 			printf("%s...No client found in this moment, refresh.\n", UDP);
-			sem_post(sem_user);
+			pthread_mutex_unlock(&sem_user);
 			continue;
 		}
 		wup->num_vehicles = n;
@@ -89,7 +89,7 @@ void* udp_sender(void* args){
 			elem = elem->next;
 		}
 		Packet_free(&wup->header);
-		sem_post(sem_user);
+		pthread_mutex_unlock(&sem_user);
 	}
 	pthread_exit(NULL);
 }
@@ -99,12 +99,12 @@ int udp_packet_handler(int socket_udp, char* buf, struct sockaddr_in client_addr
 	PacketHeader* ph = (PacketHeader*) buf;
 	if(ph->type == VehicleUpdate){
 		VehicleUpdatePacket* vup = (VehicleUpdatePacket*) Packet_deserialize(buf, ph->size);
-		sem_wait(sem_user);
+		pthread_mutex_lock(&sem_user);
 		ClientListElement* elem = clientList_find(users, vup->id);
 		if(elem == NULL){
 			printf("%s...Cannot find client with id %d in client list.\n", UDP, vup->id);
 			Packet_free(&vup->header);
-			sem_post(sem_user);
+			pthread_mutex_unlock(&sem_user);
 			return -1;
 		}
 		//update rotational and translational forces
@@ -126,7 +126,7 @@ int udp_packet_handler(int socket_udp, char* buf, struct sockaddr_in client_addr
 		elem->prev_x = elem->x;
 		elem->prev_y = elem->y;
 		
-		sem_post(sem_user);
+		pthread_mutex_unlock(&sem_user);
 		printf("%s...Updated vehicle with id %d with rotational force: %f , translational force: %f.\n", UDP, vup->id, vup->rotational_force, vup->translational_force);
 		Packet_free(&vup->header);
 		return 0;
@@ -199,10 +199,10 @@ int tcp_packet_handler(int tcp_socket_desc, int id, char* buf, Image* surface_el
 		//packet to send texture to client
 		ImagePacket* text_send = (ImagePacket*)malloc(sizeof(ImagePacket));
 		
-		sem_wait(sem_user);
+		pthread_mutex_lock(&sem_user);
 		ClientListElement* elem = clientList_find(users, id);
 		if(elem == NULL) return -1;
-		sem_post(sem_user);
+		pthread_mutex_unlock(&sem_user);
 		
 		text_send->header = ph;
 		text_send->id = id;
@@ -282,7 +282,7 @@ void* client_thread_handler(void* args){
 	tcp_args* arg = (tcp_args*)args;
 	int client_desc = arg->client_desc;
 	
-	sem_wait(sem_user);
+	pthread_mutex_lock(&sem_user);
 	printf("%s...Adding user with id %d.\n", TCP, client_desc);
 	ClientListElement* user = (ClientListElement*)malloc(sizeof(ClientListElement));
 	user->texture = NULL;
@@ -295,7 +295,7 @@ void* client_thread_handler(void* args){
 	clientList_add(users, user);
 	printf("%s...User added successfully.\n", TCP);
 	clientList_print(users);
-	sem_post(sem_user);
+	pthread_mutex_unlock(&sem_user);
 	
 	int ret;
 	char buf_recv[BUFFERSIZE];
@@ -334,16 +334,16 @@ void* client_thread_handler(void* args){
 	printf("%s...User %d disconnected.\n", TCP, client_desc);
 	printf("%s...Closing.\n", TCP);
 	
-	sem_wait(sem_user);
+	pthread_mutex_lock(&sem_user);
 	ClientListElement* elem = clientList_find(users, client_desc);
 	if(elem == NULL){
-		sem_post(sem_user);
+		pthread_mutex_unlock(&sem_user);
 		close(client_desc);
 		pthread_exit(NULL);
 	}
 	ClientListElement* canc = clientList_remove(users, elem);
 	if(canc == NULL){
-		sem_post(sem_user);
+		pthread_mutex_unlock(&sem_user);
 		close(client_desc);
 		pthread_exit(NULL);
 	}
@@ -351,7 +351,7 @@ void* client_thread_handler(void* args){
 	free(canc->vehicle);
 	Image_free(canc->texture);
 	free(canc);
-	sem_post(sem_user);
+	pthread_mutex_unlock(&sem_user);
 	close(client_desc);
 	pthread_exit(NULL);
 }
@@ -387,7 +387,7 @@ void* thread_server_tcp(void* args){
 }			
 
 int main(int argc, char **argv) {
-  if (argc<4) {
+  if (argc<3) {
     printf("usage: %s <elevation_image> <texture_image>\n", argv[1]);
     exit(-1);
   }
@@ -422,6 +422,10 @@ int main(int argc, char **argv) {
   }
   
   int ret;
+  
+  //initialize sem_user
+  //ret = pthread_mutex_init(&sem_user, 1);
+  //ERROR_HELPER(ret, "Error in initializing semaphore.\n");
   
   //UDP socket
   printf("%s... initializing UDP\n", SERVER);
@@ -532,7 +536,7 @@ int main(int argc, char **argv) {
   printf("%s...Freeing resources.\n", SERVER);
     
   //Destroy client list and pthread sem
-  sem_destroy(sem_user);
+  pthread_mutex_destroy(&sem_user);
   clientList_destroy(users);
   //Close descriptors
   ret = close(socket_tcp);

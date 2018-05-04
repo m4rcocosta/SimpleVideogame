@@ -2,8 +2,10 @@
 #define COMMON_H
 
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
-#include "errno.h"
+#include <errno.h>
+#include <string.h>
 
 //Configuration parameters
 #define TCP_PORT 	              2048
