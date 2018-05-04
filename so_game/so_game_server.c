@@ -58,11 +58,11 @@ void* udp_sender(void* args){
 			n++;
 			elem = elem->next;
 		}
-		if(n == 0){
+		/*if(n == 0){
 			printf("%s...No client found in this moment, refresh.\n", UDP);
 			pthread_mutex_unlock(&sem_user);
 			continue;
-		}
+		}*/
 		wup->num_vehicles = n;
 		World_update(&world);
 		wup->updates = (ClientUpdate*)malloc(n * sizeof(ClientUpdate));
@@ -361,10 +361,9 @@ void* client_thread_handler(void* args){
 void* thread_server_tcp(void* args){
 	int ret;
 	tcp_args* tcp_arg = (tcp_args*) args;
-	struct sockaddr_in client_addr = {0};
-	pthread_t client_thread;
 	
 	while(accepted){
+		struct sockaddr_in client_addr = {0};
 		int socket_desc_tcp = accept(socket_tcp, (struct sockaddr*) &client_addr, (socklen_t*)sizeof(struct sockaddr_in));
 		ERROR_HELPER(socket_desc_tcp, "Error in accept tcp connection.\n");
 		
@@ -374,6 +373,7 @@ void* thread_server_tcp(void* args){
 		client_args.elevation_texture = tcp_arg->elevation_texture;
 		client_args.surface_elevation = tcp_arg->surface_elevation;
 		
+		pthread_t client_thread;
 		//thread creation
 		ret = pthread_create(&client_thread, NULL, client_thread_handler, &client_args);
 		PTHREAD_ERROR_HELPER(ret, "Error in spawning client thread tcp.\n");
@@ -423,10 +423,6 @@ int main(int argc, char **argv) {
   
   int ret;
   
-  //initialize sem_user
-  //ret = pthread_mutex_init(&sem_user, 1);
-  //ERROR_HELPER(ret, "Error in initializing semaphore.\n");
-  
   //UDP socket
   printf("%s... initializing UDP\n", SERVER);
   printf("%s...Socket UDP creation\n", SERVER);
@@ -455,27 +451,6 @@ int main(int argc, char **argv) {
   users = malloc(sizeof(ClientList));
   clientList_init(users);
   printf("%s... users list initialized\n", SERVER);
-  
-  //creating thread for UDP communication
-  pthread_t thread_udp_sender, thread_udp_receiver;
-  
-  /*udp_args udp_arg;
-  udp_arg->surface_texture = surface_texture;
-  udp_arg->surface_elevation = surface_elevation;
-  udp_arg->vehicle_texture = vehicle_texture;
-  */
-  
-  ret = pthread_create(&thread_udp_receiver, NULL, udp_receiver, &socket_udp);
-  PTHREAD_ERROR_HELPER(ret, "Error in creating UDP receiver thread\n");
-  
-  ret = pthread_create(&thread_udp_sender, NULL, udp_sender, &socket_udp);
-  PTHREAD_ERROR_HELPER(ret, "Error in creating UDP sender thread\n"); 
-  
-  ret = pthread_detach(thread_udp_receiver);	//we don't wait for this thread, detach
-  PTHREAD_ERROR_HELPER(ret, "Error in detach UDP receiver thread\n");
-  
-  ret = pthread_detach(thread_udp_sender);		//we don't wait for this thread, detach
-  PTHREAD_ERROR_HELPER(ret, "Error in detach UDP sender thread\n");
   
   //TCP socket
   printf("%s... initializing TCP\n", SERVER);
@@ -520,12 +495,24 @@ int main(int argc, char **argv) {
   
   World_init(&world, surface_elevation, surface_texture,  0.5, 0.5, 0.5);
   
-  //tcp thread
-  pthread_t tcp_connect;
-  
   tcp_args tcp_arg;
   tcp_arg.elevation_texture = surface_texture;
   tcp_arg.surface_elevation = surface_elevation;
+  
+  //create threads for udp and tcp communication
+  pthread_t thread_udp_sender, thread_udp_receiver, tcp_connect;
+  
+  ret = pthread_create(&thread_udp_receiver, NULL, udp_receiver, &socket_udp);
+  PTHREAD_ERROR_HELPER(ret, "Error in creating UDP receiver thread\n");
+  
+  ret = pthread_create(&thread_udp_sender, NULL, udp_sender, &socket_udp);
+  PTHREAD_ERROR_HELPER(ret, "Error in creating UDP sender thread\n"); 
+  
+  ret = pthread_detach(thread_udp_receiver);	//we don't wait for this thread, detach
+  PTHREAD_ERROR_HELPER(ret, "Error in detach UDP receiver thread\n");
+  
+  ret = pthread_detach(thread_udp_sender);		//we don't wait for this thread, detach
+  PTHREAD_ERROR_HELPER(ret, "Error in detach UDP sender thread\n");
   
   ret = pthread_create(&tcp_connect, NULL, thread_server_tcp, &tcp_arg);
   PTHREAD_ERROR_HELPER(ret, "Error in spawning tcp thread.\n"); 
