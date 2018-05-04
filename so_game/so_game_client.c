@@ -30,13 +30,17 @@ char connected = 1, communicating = 1;
 
 // Handle Signal
 void handle_signal(int signal) {
-  // if(signal == SIGHUP);
-  if(signal == SIGINT) {
-    connected = 0;
-    communicating = 0;
-    exit(0);
+  switch (signal) {
+    case SIGHUP:
+      break;
+    case SIGINT:
+      connected = 0;
+      communicating = 0;
+      exit(0);
+    default:
+      fprintf(stderr, "Caught wrong signal: %d\n", signal);
+      return;
   }
-  else printf("%sUnknown signal.\n", CLIENT);
 }
 
 // Send Vehicle Updates
@@ -46,15 +50,16 @@ int send_updates(int socket_udp, struct sockaddr_in server_addr, int serverlengt
   ph.type = VehicleUpdate;
   VehicleUpdatePacket* vup = (VehicleUpdatePacket*)malloc(sizeof(VehicleUpdatePacket));
   vup->header = ph;
-  // Sem
+
   // Get Forces Update
   vup->translational_force = vehicle->translational_force_update;
   vup->rotational_force = vehicle->rotational_force_update;
+
   // Get X, Y, Theta
   vup->x = vehicle->x;
   vup->y = vehicle->y;
   vup->theta = vehicle->theta;
-  // Sem
+
   vup->id = id;
   int size = Packet_serialize(buf_send, &vup->header);
   int bytes_sent = sendto(socket_udp, buf_send, size, 0, (const struct sockaddr*)&server_addr, (socklen_t)serverlength);
@@ -114,7 +119,7 @@ void* receive_UDP(void* args) {
           Vehicle* new_vehicle = (Vehicle*)malloc(sizeof(vehicle));
           Vehicle_init(new_vehicle, &world, wup->updates[i].id, img);
           lw->vehicles[new_position] = new_vehicle;
-          // Sem
+
           // Set Forces Update
           lw->vehicles[new_position]->translational_force = wup->updates[i].translational_force;
           lw->vehicles[new_position]->rotational_force = wup->updates[i].rotational_force;
@@ -122,7 +127,7 @@ void* receive_UDP(void* args) {
           lw->vehicles[new_position]->x = wup->updates[i].x;
           lw->vehicles[new_position]->y = wup->updates[i].y;
           lw->vehicles[new_position]->theta = wup->updates[i].theta;
-          // Sem
+
           World_addVehicle(&world, new_vehicle);
           World_update(&world);
           lw->has_vehicle[new_position] = 1;
@@ -130,7 +135,7 @@ void* receive_UDP(void* args) {
         else {
           if(lw->has_vehicle)
           printf("%sUpdating Vehicle with id %d.\n", CLIENT, wup->updates[i].id);
-          //Sem
+
           // Set X, Y, Theta
           lw->vehicles[id_struct]->x = wup->updates[i].x;
           lw->vehicles[id_struct]->y = wup->updates[i].y;
@@ -139,7 +144,6 @@ void* receive_UDP(void* args) {
           lw->vehicles[id_struct]->translational_force = wup->updates[i].translational_force;
           lw->vehicles[id_struct]->rotational_force = wup->updates[i].rotational_force;
           World_update(&world);
-          //Sem 
 
         }
       }
@@ -151,7 +155,7 @@ void* receive_UDP(void* args) {
       exit(-1);
     }
   }
-  
+
   pthread_exit(NULL);
 }
 
@@ -188,7 +192,7 @@ int main(int argc, char **argv) {
     printf("Fail! \n");
   }
   printf("%sStarting... \n", CLIENT);
-  
+
   //Image* my_texture_for_server;      //UNUSED
   // todo: connect to the server
   //   -get ad id
@@ -325,11 +329,11 @@ int main(int argc, char **argv) {
   ERROR_HELPER(ret, "Error while closing TCP socket.\n");
   ret = close(socket_udp);
   ERROR_HELPER(ret, "Error while closing UDP socket.\n");
-  
+
   // cleanup
   World_destroy(&world);
   Image_free(map_elevation);
   Image_free(map_texture);
   Image_free(my_texture);
-  return 0;             
+  return 0;
 }
