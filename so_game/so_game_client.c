@@ -193,19 +193,9 @@ int main(int argc, char **argv) {
   }
   printf("%sStarting... \n", CLIENT);
 
-  //Image* my_texture_for_server;      //UNUSED
-  // todo: connect to the server
-  //   -get ad id
-  //   -send your texture to the server (so that all can see you)
-  //   -get an elevation map
-  //   -get the texture of the surface
-
   // these come from the server
   Image* map_elevation;
   Image* map_texture;
-  //Image* my_texture_from_server;   //UNUSED
-
-  /* MY CODE */
 
   // TCP socket
   int socket_tcp;

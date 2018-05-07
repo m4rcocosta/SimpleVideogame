@@ -1,4 +1,3 @@
-// #include <GL/glut.h> // not needed here
 #include <math.h>
 #include <string.h>
 #include <stdio.h>
@@ -30,16 +29,16 @@ World world;
 //Signal handler
 void handler(int signal){
 	switch(signal){
-		case SIGHUP:
-			break;
-		case SIGINT:
-			if(communicate) communicate = 0;
-			printf("%s...Closing server after a %d signal...\n", SERVER, signal);
-			break;
-		default:
-            fprintf(stderr, "Caught wrong signal: %d\n", signal);
-            return;
-		}
+  case SIGHUP:
+    break;
+  case SIGINT:
+    if(communicate) communicate = 0;
+    printf("%s...Closing server after a %d signal...\n", SERVER, signal);
+    break;
+  default:
+    fprintf(stderr, "Caught wrong signal: %d\n", signal);
+    return;
+  }
 }
 
 //Function to send WorldUpdatePacket updates to every client connected
@@ -62,7 +61,7 @@ void* udp_sender(void* args){
 			printf("%s...No client found in this moment, refresh.\n", UDP);
 			pthread_mutex_unlock(&sem_user);
 			continue;
-		}*/
+      }*/
 		wup->num_vehicles = n;
 		World_update(&world);
 		wup->updates = (ClientUpdate*)malloc(n * sizeof(ClientUpdate));
@@ -135,7 +134,7 @@ int udp_packet_handler(int socket_udp, char* buf, struct sockaddr_in client_addr
 } 
 
 //Function to receive via UDP 
-void* udp_receiver(void* args){
+void* udp_receiver(void* args) {
 	int socket_udp = *(int*)args;
 	while(communicate){
 		char buf[BUFFERSIZE];
@@ -157,7 +156,7 @@ void* udp_receiver(void* args){
 }
 
 //Manage various types of packets received from the TCP connection
-int tcp_packet_handler(int tcp_socket_desc, int id, char* buf, Image* surface_elevation, Image* elevation_texture){
+int tcp_packet_handler(int tcp_socket_desc, int id, char* buf, Image* surface_elevation, Image* elevation_texture) {
 	PacketHeader* header = (PacketHeader*) buf;
 	
 	if(header->type == GetId){
@@ -239,7 +238,7 @@ int tcp_packet_handler(int tcp_socket_desc, int id, char* buf, Image* surface_el
 		
 		size_t packet_len = Packet_serialize(buf_send, &(elev->header));
 		
-        int bytes_sent = 0, ret;
+    int bytes_sent = 0, ret;
 		while(bytes_sent < packet_len){
 			ret = send(socket_tcp, buf_send + bytes_sent, packet_len - bytes_sent, 0);
 			if (ret == -1 && errno == EINTR) continue;
@@ -363,8 +362,11 @@ void* thread_server_tcp(void* args){
 	tcp_args* tcp_arg = (tcp_args*) args;
 	
 	while(accepted){
-		struct sockaddr_in client_addr = {0};
-		int socket_desc_tcp = accept(socket_tcp, (struct sockaddr*) &client_addr, (socklen_t*)sizeof(struct sockaddr_in));
+		struct sockaddr_in client_addr;
+    socklen_t cli_addr_size = sizeof(client_addr);
+		int socket_desc_tcp = accept(socket_tcp,
+                                 (struct sockaddr*) &client_addr,
+                                 &cli_addr_size);
 		ERROR_HELPER(socket_desc_tcp, "Error in accept tcp connection.\n");
 		
 		//client thread args
@@ -423,34 +425,34 @@ int main(int argc, char **argv) {
   
   int ret;
   
-  //UDP socket
-  printf("%s... initializing UDP\n", SERVER);
-  printf("%s...Socket UDP creation\n", SERVER);
+  /* //UDP socket */
+  /* printf("%s... initializing UDP\n", SERVER); */
+  /* printf("%s...Socket UDP creation\n", SERVER); */
   
-  socket_udp = socket(AF_INET, SOCK_DGRAM, 0);
-  ERROR_HELPER(socket_udp, "Error in socket_udp creation\n");
+  /* socket_udp = socket(AF_INET, SOCK_DGRAM, 0); */
+  /* ERROR_HELPER(socket_udp, "Error in socket_udp creation\n"); */
   
-  struct sockaddr_in server_addr_udp = {0};
-  server_addr_udp.sin_family			= AF_INET;
-  server_addr_udp.sin_port				= htons(UDP_PORT);
-  server_addr_udp.sin_addr.s_addr	= INADDR_ANY;
+  /* struct sockaddr_in server_addr_udp = {0}; */
+  /* server_addr_udp.sin_family			= AF_INET; */
+  /* server_addr_udp.sin_port				= htons(UDP_PORT); */
+  /* server_addr_udp.sin_addr.s_addr	= INADDR_ANY; */
   
-  int reuseaddr_opt_udp = 1;		//recover a server in case of a crash
-  ret = setsockopt(socket_udp, SOL_SOCKET, SO_REUSEADDR, &reuseaddr_opt_udp, sizeof(reuseaddr_opt_udp));
-  ERROR_HELPER(ret, "Failed setsockopt() on server socket_udp");
+  /* int reuseaddr_opt_udp = 1;		//recover a server in case of a crash */
+  /* ret = setsockopt(socket_udp, SOL_SOCKET, SO_REUSEADDR, &reuseaddr_opt_udp, sizeof(reuseaddr_opt_udp)); */
+  /* ERROR_HELPER(ret, "Failed setsockopt() on server socket_udp"); */
   
-  //bind udp
-  ret = bind(socket_udp, (struct sockaddr*) &server_addr_udp, sizeof(server_addr_udp));
-  ERROR_HELPER(ret, "Error in udp binding\n");
+  /* //bind udp */
+  /* ret = bind(socket_udp, (struct sockaddr*) &server_addr_udp, sizeof(server_addr_udp)); */
+  /* ERROR_HELPER(ret, "Error in udp binding\n"); */
   
-  printf("%s... UDP socket created\n", SERVER);
+  /* printf("%s... UDP socket created\n", SERVER); */
   
-  printf("%s... creating threads for managing communications\n", SERVER);
+  /* printf("%s... creating threads for managing communications\n", SERVER); */
   
-  //initializing users list
-  users = malloc(sizeof(ClientList));
-  clientList_init(users);
-  printf("%s... users list initialized\n", SERVER);
+  /* //initializing users list */
+  /* users = malloc(sizeof(ClientList)); */
+  /* clientList_init(users); */
+  /* printf("%s... users list initialized\n", SERVER); */
   
   //TCP socket
   printf("%s... initializing TCP\n", SERVER);
@@ -459,6 +461,8 @@ int main(int argc, char **argv) {
   //socket for TCP communication
   socket_tcp = socket(AF_INET, SOCK_STREAM, 0);
   ERROR_HELPER(socket_tcp, "Error in socket creation\n");
+
+  printf("server TCP Port: %d\n", TCP_PORT);
   
   struct sockaddr_in server_addr_tcp = {0};
   server_addr_tcp.sin_family			= AF_INET;
@@ -506,7 +510,7 @@ int main(int argc, char **argv) {
   PTHREAD_ERROR_HELPER(ret, "Error in creating UDP receiver thread\n");
   
   ret = pthread_create(&thread_udp_sender, NULL, udp_sender, &socket_udp);
-  PTHREAD_ERROR_HELPER(ret, "Error in creating UDP sender thread\n"); 
+  PTHREAD_ERROR_HELPER(ret, "Error in creating UDP sender thread\n");
   
   ret = pthread_detach(thread_udp_receiver);	//we don't wait for this thread, detach
   PTHREAD_ERROR_HELPER(ret, "Error in detach UDP receiver thread\n");
@@ -515,7 +519,7 @@ int main(int argc, char **argv) {
   PTHREAD_ERROR_HELPER(ret, "Error in detach UDP sender thread\n");
   
   ret = pthread_create(&tcp_connect, NULL, thread_server_tcp, &tcp_arg);
-  PTHREAD_ERROR_HELPER(ret, "Error in spawning tcp thread.\n"); 
+  PTHREAD_ERROR_HELPER(ret, "Error in spawning tcp thread.\n");
   
   ret = pthread_join(tcp_connect, NULL);
   PTHREAD_ERROR_HELPER(ret, "Error in join tcp thread.\n");
@@ -536,5 +540,5 @@ int main(int argc, char **argv) {
 	
   World_destroy(&world);
 	
-  exit(EXIT_SUCCESS);          
+  exit(EXIT_SUCCESS);
 }
