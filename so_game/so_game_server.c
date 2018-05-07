@@ -431,7 +431,7 @@ void* udp_handler(void* args){
 
 int main(int argc, char **argv) {
 
-	char *elevation_filename = NULL, texture_filename = NULL;
+	char *elevation_filename = NULL, *texture_filename = NULL;
 
 	if (argc == 1) {
     elevation_filename = MAP_ELEVATION;
