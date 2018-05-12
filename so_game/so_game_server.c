@@ -154,122 +154,72 @@ void* udp_receiver(void* args) {
 }*/
 
 //Manage various types of packets received from the TCP connection
-int tcp_packet_handler(int tcp_socket_desc, int id, char* buf, Image* surface_elevation, Image* elevation_texture) {
-	PacketHeader* header = (PacketHeader*) buf;
+int tcp_packet_handler(int tcp_socket_desc, int id, char* buf_rec, char* buf_send, Image* surface_elevation, Image* elevation_texture) {
+	PacketHeader* header = (PacketHeader*) buf_rec;
+	int packet_len;
 
 	if(header->type == GetId){
+		printf("%s... Received GetId request from %d user.\n", TCP, id);
 		IdPacket* idp = (IdPacket*)malloc(sizeof(IdPacket));
 		idp->id = id;
 		PacketHeader ph;
 		ph.type = GetId;
 		idp->header = ph;
 
-		char buf_send[BUFFERSIZE];
-		size_t packet_len = Packet_serialize(buf_send, &(idp->header));
-
-		//send the packet via socket
-		int bytes_sent = 0, ret;
-		while(bytes_sent < packet_len){
-			ret = send(socket_tcp, buf_send + bytes_sent, packet_len - bytes_sent, 0);
-			if (ret == -1 && errno == EINTR) continue;
-			ERROR_HELPER(ret, "Error in elevation request.\n");
-			if (ret == 0) break;
-			bytes_sent += ret;
-		}
-
-		Packet_free(&(idp->header));
-		free(idp);
-
-		printf("%s...Sent %d bytes.\n", TCP, ret);
-		return 1;
+		packet_len = Packet_serialize(buf_send, &(idp->header));
+		return packet_len;
 	}
-
 	else if(header->type == GetTexture){
-		ImagePacket* imp = (ImagePacket*) buf;
-		int id = imp->id;
-		char buf_send[BUFFERSIZE];
-
-		//header for the answer
+		printf("%s... Received GetTexture request from %d user.\n", TCP, id);
+		ImagePacket imp = *(ImagePacket*)Packet_deserialize(buf_rec, header->size);
+		ImagePacket image_packet;
 		PacketHeader ph;
-		ph.type = PostTexture;
-
-		//packet to send texture to client
-		ImagePacket* text_send = (ImagePacket*)malloc(sizeof(ImagePacket));
-
+		int id = imp.id;
+		
+		printf("%s...Searching %d user texture.\n", TCP, id);
 		pthread_mutex_lock(&sem_user);
+		
 		ClientListElement* elem = clientList_find(users, id);
 		if(elem == NULL) return -1;
+
+		image_packet.header = ph;
+		image_packet.id = id;
+		image_packet.image = elem->vehicle->texture;
+			
 		pthread_mutex_unlock(&sem_user);
-
-		text_send->header = ph;
-		text_send->id = id;
-		text_send->image = elevation_texture;
-
-		int packet_len = Packet_serialize(buf_send, &(imp->header));
-		int bytes_sent = 0, ret;
-		while(bytes_sent < packet_len){
-			ret = send(socket_tcp, buf_send + bytes_sent, packet_len - bytes_sent, 0);
-			if (ret == -1 && errno == EINTR) continue;
-			ERROR_HELPER(ret, "Error in elevation request.\n");
-			if (ret == 0) break;
-			bytes_sent += ret;
-		}
-
-		Packet_free(&(text_send->header));
-		free(text_send);
-
-		printf("%s...Texture sent to id %d.\n", TCP, id);
-		return 1;
+			
+		packet_len = Packet_serialize(buf_send, &image_packet.header);
+		return packet_len;
 	}
 	else if(header->type == GetElevation){
-		ImagePacket* imp = (ImagePacket*) buf;
+		printf("%s... Received GetElevation request from %d user.\n", TCP, id);
+		ImagePacket* imp = (ImagePacket*)malloc(sizeof(ImagePacket));
 		int id = imp->id;
 		PacketHeader ph;
 		ph.type = PostElevation;
-		char buf_send[BUFFERSIZE];
 
-		//packet to sent elevation to client
-		ImagePacket* elev = (ImagePacket*)malloc(sizeof(ImagePacket));
-		elev->header = ph;
-		elev->id = id;
-		elev->image = surface_elevation;
+		imp->header = ph;
+		imp->id = id;
+		imp->image = surface_elevation;
 
-		size_t packet_len = Packet_serialize(buf_send, &(elev->header));
-
-    int bytes_sent = 0, ret;
-		while(bytes_sent < packet_len){
-			ret = send(socket_tcp, buf_send + bytes_sent, packet_len - bytes_sent, 0);
-			if (ret == -1 && errno == EINTR) continue;
-			ERROR_HELPER(ret, "Error in elevation request.\n");
-			if (ret == 0) break;
-			bytes_sent += ret;
-		}
-
-		Packet_free(&(elev->header));
-		free(elev);
-
-		printf("%s...Sent texture to id %d.\n",TCP, id);
-		return 1;
+		packet_len = Packet_serialize(buf_send, &(imp->header));
+		return packet_len;
 	}
 	else if(header->type == PostTexture){
-		PacketHeader* ph = Packet_deserialize(buf, header->size);
-		ImagePacket* imp = (ImagePacket*) ph;
+		printf("%s... Received PostTexture request from %d user.\n", TCP, id);
+		ImagePacket* imp = (ImagePacket*)Packet_deserialize(buf_rec, header->size);
 
 		Vehicle* vehicle = (Vehicle*)malloc(sizeof(Vehicle));
 		Vehicle_init(vehicle, &world, id, imp->image);
 		World_addVehicle(&world, vehicle);
 
-		Packet_free(ph);
-		free(imp);
-		printf("%s...Texture received id %d.\n", TCP, id);
-		return 1;
+		return 0;
 	}
-	//error case
+	//Error case
 	else{
 		printf("%s...Unknown packet type id %d.\n", TCP, id);
 		return -1;
 	}
-	return -1;
 }
 
 //Add a new user to the list when it's connected
@@ -294,37 +244,39 @@ void* client_thread_handler(void* args){
 	clientList_print(users);
 	pthread_mutex_unlock(&sem_user);
 
-	int ret;
-	char buf_recv[BUFFERSIZE];
+	int ret, bytes_read, msg_len;
+	char buf_recv[BUFFERSIZE], buf_send[BUFFERSIZE];
 	size_t ph_len = sizeof(PacketHeader);
 
 	while(communicate){
 		//Receiving packet
-		int bytes_read = 0;
-		while(bytes_read < ph_len) {
-			ret = recv(socket_tcp, buf_recv + bytes_read, ph_len, 0);
-			if (errno == EINTR) continue;
-			if (errno == ENOTCONN) {
-				printf("Connection closed.\n");
-				break;
-			}
-			bytes_read++;
+		bytes_read = 0;
+		bytes_read = recv(client_desc, buf_recv, ph_len, 0);
+		printf("%s... %d bytes header received.\n", TCP, bytes_read);
+		
+		if(bytes_read == -1){
+			printf("%s... Error in receiving header in tcp. Disconnection.\n", TCP);
 		}
 
 		PacketHeader* header = (PacketHeader*) buf_recv;
-		int size = header->size - ph_len;
-		int msg_len = 0;
-
-		while(msg_len < size){
-			ret = recv(client_desc, buf_recv + msg_len + ph_len, size - msg_len, 0);
-			if (ret==-1 && errno == EINTR) continue;
-			ERROR_HELPER(ret, "Error in receiving data in tcp.\n");
-			msg_len += ret;
+		while(bytes_read < header->size){
+			ret = recv(client_desc, buf_recv + bytes_read, header->size - bytes_read, 0);
+			if(ret == 0 || ret == -1) ERROR_HELPER(ret, "Error in receiving data in tcp.\n");
+			bytes_read += ret;
 		}
-
-		ret = tcp_packet_handler(client_desc, arg->client_desc, buf_recv, arg->surface_elevation, arg->elevation_texture);
-		if(ret == 1) printf("%s...Packet managed successfully.\n", TCP);
-		else printf("%s...Failure in managing packet\n", TCP);
+		printf("%s... Received %d bytes by %d.\n", TCP, bytes_read, user->id);
+		
+		//handler to generate the answer
+		msg_len = tcp_packet_handler(client_desc, arg->client_desc, buf_recv, buf_send, arg->surface_elevation, arg->elevation_texture);
+		printf("%s... Packet handler on %d user.\n", TCP, user->id);
+		if(msg_len < 1) continue;
+		
+		//send answer to the client
+		ret = send(client_desc, buf_send, msg_len, 0);
+		if(msg_len == -1 && errno != EINTR){
+			printf("%s...Error in sending data via tcp.\n", TCP);
+			break;
+		}
 	}
 
 	//if we exit from the while cicle, we have to deallocate and close
@@ -378,8 +330,6 @@ void* udp_handler(void* args){
 		
 	ret = bind(socket_udp, (struct sockaddr*) &my_addr, sizeof(my_addr));
 	ERROR_HELPER(ret, "Error in binding.\n");
-	
-	Vehicle* v = World_getVehicle(&world, id);
 	
 	while(communicate){	
 		addrlen = sizeof(struct sockaddr);
