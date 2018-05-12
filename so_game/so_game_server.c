@@ -154,9 +154,10 @@ void* udp_receiver(void* args) {
 }*/
 
 //Manage various types of packets received from the TCP connection
-int tcp_packet_handler(int tcp_socket_desc, int id, char* buf_rec, char* buf_send, Image* surface_elevation, Image* elevation_texture) {
+int tcp_packet_handler(int tcp_socket_desc, char* buf_rec, char* buf_send, Image* surface_elevation, Image* elevation_texture) {
 	PacketHeader* header = (PacketHeader*) buf_rec;
 	int packet_len;
+	int id = tcp_socket_desc;
 
 	if(header->type == GetId){
 		printf("%s... Received GetId request from %d user.\n", TCP, id);
@@ -267,16 +268,18 @@ void* client_thread_handler(void* args){
 		printf("%s... Received %d bytes by %d.\n", TCP, bytes_read, user->id);
 		
 		//handler to generate the answer
-		msg_len = tcp_packet_handler(client_desc, arg->client_desc, buf_recv, buf_send, arg->surface_elevation, arg->elevation_texture);
+		msg_len = tcp_packet_handler(client_desc, buf_recv, buf_send, arg->surface_elevation, arg->elevation_texture);
 		printf("%s... Packet handler on %d user.\n", TCP, user->id);
 		if(msg_len < 1) continue;
 		
 		//send answer to the client
+		printf("%s...Sending data to the client..\n", TCP);
 		ret = send(client_desc, buf_send, msg_len, 0);
 		if(msg_len == -1 && errno != EINTR){
 			printf("%s...Error in sending data via tcp.\n", TCP);
 			break;
 		}
+		printf("%s... Operation success! Continue...\n\n", TCP);
 	}
 
 	//if we exit from the while cicle, we have to deallocate and close

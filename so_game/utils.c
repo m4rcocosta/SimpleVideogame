@@ -140,7 +140,7 @@ Image* get_Texture_Map(int socket) {
   PacketHeader ph;
   ph.type = GetTexture;
   request->header = ph;
-  request->id = -1;
+  request->id = socket;
   int size = Packet_serialize(buf_send, &(request->header));
   if (size == -1) return NULL;
   int bytes_sent = 0;
