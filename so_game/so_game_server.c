@@ -209,10 +209,20 @@ int tcp_packet_handler(int tcp_socket_desc, char* buf_rec, char* buf_send, Image
 	else if(header->type == PostTexture){
 		printf("%s... Received PostTexture request from %d user.\n", TCP, id);
 		ImagePacket* imp = (ImagePacket*)Packet_deserialize(buf_rec, header->size);
-
+		
 		Vehicle* vehicle = (Vehicle*)malloc(sizeof(Vehicle));
 		Vehicle_init(vehicle, &world, id, imp->image);
 		World_addVehicle(&world, vehicle);
+		pthread_mutex_lock(&sem_user);
+		
+		ClientListElement* elem = clientList_find(users, id);
+		if(elem == NULL) return -1;
+		
+		elem->vehicle = vehicle;
+		elem->texture = imp->image;
+		elem->vehicle->texture = imp->image;
+		
+		pthread_mutex_unlock(&sem_user);
 
 		return 0;
 	}
@@ -270,8 +280,8 @@ void* client_thread_handler(void* args){
 		//handler to generate the answer
 		msg_len = tcp_packet_handler(client_desc, buf_recv, buf_send, arg->surface_elevation, arg->elevation_texture);
 		printf("%s... Packet handler on %d user.\n", TCP, user->id);
-		if(msg_len == 0) continue;
-		else if(msg_len == -1) break;
+		//if(msg_len == 0) continue;
+		if(msg_len == -1) break;
 		
 		//send answer to the client
 		printf("%s...Sending data to the client..\n", TCP);
@@ -409,12 +419,12 @@ void* thread_server_tcp(void* args){
 		client_args.surface_elevation = tcp_arg->surface_elevation;
 
 		pthread_t client_thread, udp_handler_thread;
+		
 		//thread creation
 		ret = pthread_create(&client_thread, NULL, client_thread_handler, &client_args);
 		PTHREAD_ERROR_HELPER(ret, "Error in spawning client thread tcp.\n");
 
-		//we don't wait for client thread, detach
-		ret = pthread_join(client_thread, NULL);
+		ret = pthread_detach(client_thread);
 		PTHREAD_ERROR_HELPER(ret, "Error in detach client thread tcp.\n");
 		
 		ret = pthread_create(&udp_handler_thread, NULL, udp_handler, &socket_desc_tcp);
@@ -422,6 +432,7 @@ void* thread_server_tcp(void* args){
 
 		ret = pthread_detach(udp_handler_thread);	//we don't wait for this thread, detach
 		PTHREAD_ERROR_HELPER(ret, "Error in detach UDP receiver thread\n");
+		
 	}
 
 	pthread_exit(NULL);
