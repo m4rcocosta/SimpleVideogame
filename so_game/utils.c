@@ -76,21 +76,21 @@ int get_ID(int socket) {
     msg_len += ret;
   }
   IdPacket* deserialized_packet = (IdPacket*)Packet_deserialize(buf_rcv, msg_len + ph_len);
-  printf("[Get Id] Received %dbytes \n", msg_len + ph_len);
+  printf("[Get Id] Received %d bytes, id = %d \n", msg_len + ph_len, deserialized_packet->id);
   int id = deserialized_packet->id;
   Packet_free(&(deserialized_packet->header));
   return id;
 }
 
 // Get Elevation Map
-Image* get_Elevation_Map(int socket) {
+Image* get_Elevation_Map(int socket, int id) {
   char buf_send[BUFFERSIZE];
   char buf_rcv[BUFFERSIZE];
   ImagePacket* request = (ImagePacket*)malloc(sizeof(ImagePacket));
   PacketHeader ph;
   ph.type = GetElevation;
   request->header = ph;
-  request->id = -1;
+  request->id = id;
   int size = Packet_serialize(buf_send, &(request->header));
   if (size == -1) return NULL;
   int bytes_sent = 0;
@@ -133,14 +133,14 @@ Image* get_Elevation_Map(int socket) {
 }
 
 // Get Texture Map
-Image* get_Texture_Map(int socket) {
+Image* get_Texture_Map(int socket, int id) {
   char buf_send[BUFFERSIZE];
   char buf_rcv[BUFFERSIZE];
   ImagePacket* request = (ImagePacket*)malloc(sizeof(ImagePacket));
   PacketHeader ph;
   ph.type = GetTexture;
   request->header = ph;
-  request->id = socket;
+  request->id = id;
   int size = Packet_serialize(buf_send, &(request->header));
   if (size == -1) return NULL;
   int bytes_sent = 0;

@@ -44,10 +44,10 @@ int addUser(int ids[], int size, int id2, int* position, int* users_online);
 int get_ID(int socket);
 
 // Get Elevation Map
-Image* get_Elevation_Map(int socket);
+Image* get_Elevation_Map(int socket, int id);
 
 // Get Texture Map
-Image* get_Texture_Map(int socket);
+Image* get_Texture_Map(int socket, int id);
 
 // Send Vehicle Texture
 int send_Vehicle_Texture(int socket, Image *texture, int id);

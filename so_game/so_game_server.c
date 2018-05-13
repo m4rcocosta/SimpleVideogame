@@ -172,10 +172,10 @@ int tcp_packet_handler(int tcp_socket_desc, char* buf_rec, char* buf_send, Image
 	}
 	else if(header->type == GetTexture){
 		printf("%s... Received GetTexture request from %d user.\n", TCP, id);
-		ImagePacket imp = *(ImagePacket*)Packet_deserialize(buf_rec, header->size);
+		ImagePacket* imp = (ImagePacket*)Packet_deserialize(buf_rec, header->size);
 		ImagePacket image_packet;
 		PacketHeader ph;
-		int id = imp.id;
+		id = imp->id;
 		
 		printf("%s...Searching %d user texture.\n", TCP, id);
 		pthread_mutex_lock(&sem_user);
@@ -183,13 +183,13 @@ int tcp_packet_handler(int tcp_socket_desc, char* buf_rec, char* buf_send, Image
 		ClientListElement* elem = clientList_find(users, id);
 		if(elem == NULL) return -1;
 
+		ph.type = PostTexture;
 		image_packet.header = ph;
-		image_packet.id = id;
-		image_packet.image = elem->vehicle->texture;
+		image_packet.id = elem->id;
+		image_packet.image = elevation_texture;
+		packet_len = Packet_serialize(buf_send, &(image_packet.header));
 			
 		pthread_mutex_unlock(&sem_user);
-			
-		packet_len = Packet_serialize(buf_send, &image_packet.header);
 		return packet_len;
 	}
 	else if(header->type == GetElevation){
@@ -224,7 +224,7 @@ int tcp_packet_handler(int tcp_socket_desc, char* buf_rec, char* buf_send, Image
 }
 
 //Add a new user to the list when it's connected
-//Function to receive packets from the client
+//Function to receive/send packets from/to the client
 //Remove the user when it's disconnected
 void* client_thread_handler(void* args){
 	tcp_args* arg = (tcp_args*)args;
@@ -270,7 +270,8 @@ void* client_thread_handler(void* args){
 		//handler to generate the answer
 		msg_len = tcp_packet_handler(client_desc, buf_recv, buf_send, arg->surface_elevation, arg->elevation_texture);
 		printf("%s... Packet handler on %d user.\n", TCP, user->id);
-		if(msg_len < 1) continue;
+		if(msg_len == 0) continue;
+		else if(msg_len == -1) break;
 		
 		//send answer to the client
 		printf("%s...Sending data to the client..\n", TCP);
@@ -298,11 +299,14 @@ void* client_thread_handler(void* args){
 		pthread_mutex_unlock(&sem_user);
 		close(client_desc);
 		pthread_exit(NULL);
-	}
+	}	
 	World_detachVehicle(&world, canc->vehicle);
 	free(canc->vehicle);
 	Image_free(canc->texture);
 	free(canc);
+	printf("%s... User %d removed from list.\n", TCP, elem->id);
+	clientList_print(users);
+	
 	pthread_mutex_unlock(&sem_user);
 	close(client_desc);
 	pthread_exit(NULL);
@@ -410,7 +414,7 @@ void* thread_server_tcp(void* args){
 		PTHREAD_ERROR_HELPER(ret, "Error in spawning client thread tcp.\n");
 
 		//we don't wait for client thread, detach
-		ret = pthread_detach(client_thread);
+		ret = pthread_join(client_thread, NULL);
 		PTHREAD_ERROR_HELPER(ret, "Error in detach client thread tcp.\n");
 		
 		ret = pthread_create(&udp_handler_thread, NULL, udp_handler, &socket_desc_tcp);

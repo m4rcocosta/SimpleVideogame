@@ -226,9 +226,9 @@ int main(int argc, char **argv) {
   id = get_ID(socket_tcp);
   local_world->ids[0] = id;
   printf("%sID number %d received.\n", CLIENT, id);
-  map_elevation = get_Elevation_Map(socket_tcp);
+  map_elevation = get_Elevation_Map(socket_tcp, id);
   printf("%sMap elevation received.\n", CLIENT);
-  map_texture = get_Texture_Map(socket_tcp);
+  map_texture = get_Texture_Map(socket_tcp, id);
   printf("%sMap texture received.\n", CLIENT);
   printf("%sSending vehicle texture...\n", CLIENT);
   send_Vehicle_Texture(socket_tcp, my_texture, id);
