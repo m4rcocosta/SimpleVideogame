@@ -43,7 +43,6 @@ void clean_resources(void) {
     World_detachVehicle(&world, local_world->vehicles[i]);
     if (im != NULL) Image_free(im);
     Vehicle_destroy(local_world->vehicles[i]);
-    free(local_world->vehicles[i]);
   }
   free(local_world->vehicles);
   free(local_world);
@@ -56,9 +55,9 @@ void clean_resources(void) {
   printf("%ssocket_udp closed.\n", CLIENT);
   World_destroy(&world);
   printf("%sworld released\n", CLIENT);
-  Image_free(map_elevation);
-  Image_free(map_texture);
-  Image_free(my_texture);
+  if(map_elevation == NULL) Image_free(map_elevation);
+  if(map_elevation == NULL) Image_free(map_texture);
+  if(map_elevation == NULL) Image_free(my_texture);
   printf("%smap_elevation, map_texture, my_texture released\n", CLIENT);
   return;
 }
@@ -183,30 +182,26 @@ void* receive_UDP(void* args) {
           World_update(&world);
 
         }
-        Vehicle* current = (Vehicle*) world.vehicles.first;
-        for(int i = 0; i < world.vehicles.size; i++){
-			       int in = 0, forward = 0;
-			       for(int j = 0; j < wup->num_vehicles && !in; j++){
-				           if(current->id == wup->updates[j].id){
-					                in = 1;
-				           }
-			       }
+        for(int i = 0; i < WORLDSIZE; i++){
+			    int in = 0;
+          if (lw->ids[i] == -1) continue;
+			    for(int j = 0; j < wup->num_vehicles && !in; j++){
+				    if(lw->ids[i] == wup->updates[j].id){
+					    in = 1;
+				    }
+			    }
 
-			      if(!in){
-				          Vehicle* toDelete = current;
-				          World_detachVehicle(&world, toDelete);
-                  Vehicle_destroy(toDelete);
-				          current = (Vehicle*) current->list.next;
-				          forward = 1;
-				          free(toDelete);
-                  lw->has_vehicle[i] = -1;
-                  lw->users_online -= 1;
-                  if (lw->vehicles[i]->texture != NULL) Image_free(lw->vehicles[i]->texture);
-                  free(lw->vehicles[i]);
-			      }
-
-			   if(!forward) current = (Vehicle*) current->list.next;
-		  }
+			    if(!in){
+            Image* im = lw->vehicles[i]->texture;
+				    World_detachVehicle(&world, lw->vehicles[i]);
+            if (im != NULL) Image_free(im);
+            Vehicle_destroy(lw->vehicles[i]);
+            World_update(&world);
+            lw->has_vehicle[i] = -1;
+            lw->ids[i] = -1;
+            lw->users_online --;
+			    }
+		    }
       }
     }
     else {
