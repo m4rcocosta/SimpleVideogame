@@ -28,7 +28,7 @@ Vehicle* vehicle; // The vehicle
 
 int ret, id, socket_tcp, socket_udp;
 struct sockaddr_in server_addr_tcp = {0}, server_addr_udp = {0};
-char connected = 1, communicating = 1;
+char connected = 1;
 Image *map_elevation, *map_texture, *my_texture;
 localWorld* local_world;
 
@@ -72,7 +72,6 @@ void handle_signal(int signal) {
     case SIGTERM:
     case SIGINT:
       connected = 0;
-      communicating = 0;
       sleep(1);
       clean_resources();
       exit(0);
@@ -114,7 +113,7 @@ void* send_UDP(void* args) {
   struct sockaddr_in server_addr = udp_args.server_addr_udp;
   int socket_udp = udp_args.socket_udp;
   int server_length = sizeof(server_addr);
-  while (connected && communicating) {
+  while (connected) {
     int ret = send_updates(socket_udp, server_addr, server_length);
     if (ret == -1)
       printf("%sCannot send VehicleUpdatePacket.\n", CLIENT);
@@ -130,7 +129,7 @@ void* receive_UDP(void* args) {
   socklen_t addrlen = sizeof(server_addr);
   localWorld* lw = udp_args.local_world;
   int socket_tcp = udp_args.socket_tcp;
-  while (connected && communicating) {
+  while (connected) {
     char receive_buffer[BUFFERSIZE];
     int bytes_read = recvfrom(socket_udp, receive_buffer, BUFFERSIZE, 0, (struct sockaddr*)&server_addr, &addrlen);
     if(bytes_read == -1) {
@@ -172,7 +171,6 @@ void* receive_UDP(void* args) {
           lw->has_vehicle[new_position] = 1;
         }
         else {
-          if(lw->has_vehicle)
           printf("%sUpdating Vehicle with id %d.\n", CLIENT, wup->updates[i].id);
 
           // Set X, Y, Theta
@@ -185,12 +183,35 @@ void* receive_UDP(void* args) {
           World_update(&world);
 
         }
+        Vehicle* current = (Vehicle*) world.vehicles.first;
+        for(int i = 0; i < world.vehicles.size; i++){
+			       int in = 0, forward = 0;
+			       for(int j = 0; j < wup->num_vehicles && !in; j++){
+				           if(current->id == wup->updates[j].id){
+					                in = 1;
+				           }
+			       }
+
+			      if(!in){
+				          Vehicle* toDelete = current;
+				          World_detachVehicle(&world, toDelete);
+                  Vehicle_destroy(toDelete);
+				          current = (Vehicle*) current->list.next;
+				          forward = 1;
+				          free(toDelete);
+                  lw->has_vehicle[i] = -1;
+                  lw->users_online -= 1;
+                  if (lw->vehicles[i]->texture != NULL) Image_free(lw->vehicles[i]->texture);
+                  free(lw->vehicles[i]);
+			      }
+
+			   if(!forward) current = (Vehicle*) current->list.next;
+		  }
       }
     }
     else {
       printf("%sError: received unknown packet.\n", CLIENT);
       connected = 0;
-      communicating = 0;
       exit(-1);
     }
   }
@@ -278,7 +299,7 @@ int main(int argc, char **argv) {
   server_addr_udp.sin_family = AF_INET;
   server_addr_udp.sin_port = htons(UDP_PORT);
 
- // Threads sender and receiver 
+ // Threads sender and receiver
   pthread_t sender_udp, receiver_udp;
   client_args udp_args;
   udp_args.socket_tcp = socket_tcp;
@@ -298,7 +319,6 @@ int main(int argc, char **argv) {
   // Waiting threads to end and cleaning resources
   printf("%sDisabling and joining on UDP and TCP threads.\n", CLIENT);
   connected = 0;
-  communicating = 0;
   ret = pthread_join(sender_udp, NULL);
   PTHREAD_ERROR_HELPER(ret, "Error pthread_join on thread UDP_sender.\n");
   ret = pthread_join(receiver_udp, NULL);
