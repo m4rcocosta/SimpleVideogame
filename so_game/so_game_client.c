@@ -20,22 +20,61 @@
 #include "utils.h"
 #include "common.h"
 
+// Variables
 int window;
 WorldViewer viewer;
 World world;
 Vehicle* vehicle; // The vehicle
 
-int ret, id;
+int ret, id, socket_tcp, socket_udp;
+struct sockaddr_in server_addr_tcp = {0}, server_addr_udp = {0};
 char connected = 1, communicating = 1;
+Image *map_elevation, *map_texture, *my_texture;
+localWorld* local_world;
+
+// Clean resources
+void clean_resources(void) {
+  printf("%sCleaning up...\n", CLIENT);
+  for (int i = 0; i < WORLDSIZE; i++) {
+    if (local_world->ids[i] == -1) continue;
+    if (i == 0) continue;
+    local_world->users_online--;
+    Image* im = local_world->vehicles[i]->texture;
+    World_detachVehicle(&world, local_world->vehicles[i]);
+    if (im != NULL) Image_free(im);
+    Vehicle_destroy(local_world->vehicles[i]);
+    free(local_world->vehicles[i]);
+  }
+  free(local_world->vehicles);
+  free(local_world);
+  printf("%slocal_world released.\n", CLIENT);
+  ret = close(socket_tcp);
+  ERROR_HELPER(ret, "Error while closing TCP socket.\n");
+  printf("%ssocket_tcp closed.\n", CLIENT);
+  ret = close(socket_udp);
+  ERROR_HELPER(ret, "Error while closing UDP socket.\n");
+  printf("%ssocket_udp closed.\n", CLIENT);
+  World_destroy(&world);
+  printf("%sworld released\n", CLIENT);
+  Image_free(map_elevation);
+  Image_free(map_texture);
+  Image_free(my_texture);
+  printf("%smap_elevation, map_texture, my_texture released\n", CLIENT);
+  return;
+}
 
 // Handle Signal
 void handle_signal(int signal) {
   switch (signal) {
     case SIGHUP:
       break;
+    case SIGQUIT:
+    case SIGTERM:
     case SIGINT:
       connected = 0;
       communicating = 0;
+      sleep(1);
+      clean_resources();
       exit(0);
     default:
       fprintf(stderr, "Caught wrong signal: %d\n", signal);
@@ -167,7 +206,7 @@ int main(int argc, char **argv) {
   }
 
   printf("%sLoading texture image from %s ... ", CLIENT, argv[2]);
-  Image* my_texture = Image_load(argv[2]);
+  my_texture = Image_load(argv[2]);
   if (my_texture) {
     printf("Done! \n");
   } else {
@@ -175,14 +214,19 @@ int main(int argc, char **argv) {
   }
   printf("%sStarting... \n", CLIENT);
 
-  // these come from the server
-  Image* map_elevation;
-  Image* map_texture;
+  // Signal handlers
+  struct sigaction sa;
+  sa.sa_handler = handle_signal;
+  // Restart the system call, if at all possible
+  sa.sa_flags = SA_RESTART;
+  // Block every signal during the handler
+  sigfillset(&sa.sa_mask);
+  ret = sigaction(SIGHUP, &sa, NULL);
+  ERROR_HELPER(ret, "Error: cannot handle SIGHUP.\n");
+  ret = sigaction(SIGINT, &sa, NULL);
+  ERROR_HELPER(ret, "Error: cannot handle SIGINT.\n");
 
   // TCP socket
-  int socket_tcp;
-  struct sockaddr_in server_addr_tcp = {0};
-
   socket_tcp = socket(AF_INET, SOCK_STREAM, 0);
   ERROR_HELPER(socket_tcp, "Error while creating socket_tcp");
 
@@ -196,7 +240,7 @@ int main(int argc, char **argv) {
   printf("%sTCP connection established...\n", CLIENT);
 
   // Setting up localWorld
-  localWorld* local_world = (localWorld*)malloc(sizeof(localWorld));
+  local_world = (localWorld*)malloc(sizeof(localWorld));
   local_world->vehicles = (Vehicle**)malloc(sizeof(Vehicle*) * WORLDSIZE);
   for (int i = 0; i < WORLDSIZE; i++) {
     local_world->ids[i] = -1;
@@ -216,18 +260,6 @@ int main(int argc, char **argv) {
   send_Vehicle_Texture(socket_tcp, my_texture, id);
   printf("%sClient Vehicle texture sent.\n", TCP);
 
-  // Signal handlers
-  struct sigaction sa;
-  sa.sa_handler = handle_signal;
-  // Restart the system call, if at all possible
-  sa.sa_flags = SA_RESTART;
-  // Block every signal during the handler
-  sigfillset(&sa.sa_mask);
-  ret = sigaction(SIGHUP, &sa, NULL);
-  ERROR_HELPER(ret, "Error: cannot handle SIGHUP.\n");
-  ret = sigaction(SIGINT, &sa, NULL);
-  ERROR_HELPER(ret, "Error: cannot handle SIGINT.\n");
-
   // construct the world
   World_init(&world, map_elevation, map_texture, 0.5, 0.5, 0.5);
   vehicle = (Vehicle*)malloc(sizeof(Vehicle));
@@ -238,9 +270,6 @@ int main(int argc, char **argv) {
   printf("%sWorld ready!\n", CLIENT);
 
   // UDP socket
-  int socket_udp;
-  struct sockaddr_in server_addr_udp = {0};
-
   socket_udp = socket(AF_INET, SOCK_DGRAM, 0);
   ERROR_HELPER(socket_udp, "Error while creating socket_udp.\n");
   printf("%sUDP socket created...\n", CLIENT);
@@ -249,8 +278,7 @@ int main(int argc, char **argv) {
   server_addr_udp.sin_family = AF_INET;
   server_addr_udp.sin_port = htons(UDP_PORT);
 
-  printf("%sUDP socket configured...\n", CLIENT);
-
+ // Threads sender and receiver 
   pthread_t sender_udp, receiver_udp;
   client_args udp_args;
   udp_args.socket_tcp = socket_tcp;
@@ -264,7 +292,7 @@ int main(int argc, char **argv) {
   PTHREAD_ERROR_HELPER(ret, "[CLIENT] Error while creating thread receiver_udp.\n");
   printf("%sThread receiveer_udp created.\n", CLIENT);
 
-  // Disconnect
+  // Run
   WorldViewer_runGlobal(&world, vehicle, &argc, argv);
 
   // Waiting threads to end and cleaning resources
@@ -275,32 +303,6 @@ int main(int argc, char **argv) {
   PTHREAD_ERROR_HELPER(ret, "Error pthread_join on thread UDP_sender.\n");
   ret = pthread_join(receiver_udp, NULL);
   PTHREAD_ERROR_HELPER(ret, "Error pthread_join on thread UDP_receiver.\n");
-
-  printf("%sCleaning up...\n", CLIENT);
-
-  // Clean resources
-  for (int i = 0; i < WORLDSIZE; i++) {
-    if (local_world->ids[i] == -1) continue;
-    if (i == 0) continue;
-    local_world->users_online--;
-    Image* im = local_world->vehicles[i]->texture;
-    World_detachVehicle(&world, local_world->vehicles[i]);
-    if (im != NULL) Image_free(im);
-    Vehicle_destroy(local_world->vehicles[i]);
-    free(local_world->vehicles[i]);
-  }
-
-  free(local_world->vehicles);
-  free(local_world);
-  ret = close(socket_tcp);
-  ERROR_HELPER(ret, "Error while closing TCP socket.\n");
-  ret = close(socket_udp);
-  ERROR_HELPER(ret, "Error while closing UDP socket.\n");
-
-  // cleanup
-  World_destroy(&world);
-  Image_free(map_elevation);
-  Image_free(map_texture);
-  Image_free(my_texture);
+  clean_resources();
   return 0;
 }
