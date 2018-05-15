@@ -79,20 +79,9 @@ int udp_packet_handler(int socket_udp, char* buf, struct sockaddr_in client_addr
 		elem->vehicle->y = vup->y;
 		elem->vehicle->theta = vup->theta;
 		World_update(&world);
-		//update x_shift and y_shift
-		if(elem->x >= elem->prev_x)
-			elem->x_shift = elem->x - elem->prev_x;
-		else
-			elem->x_shift = elem->prev_x - elem->x;
-		if(elem->y >= elem->prev_y)
-			elem->y_shift = elem->y - elem->prev_y;
-		else
-			elem->y_shift = elem->prev_y - elem->y;
-		elem->prev_x = elem->x;
-		elem->prev_y = elem->y;
 
 		pthread_mutex_unlock(&sem_user);
-		printf("%s...Updated vehicle with id %d with rotational force: %f , translational force: %f.\n", UDP, vup->id, vup->rotational_force, vup->translational_force);
+		if(DEBUG) printf("%s...Updated vehicle with id %d with rotational force: %f , translational force: %f.\n", UDP, vup->id, vup->rotational_force, vup->translational_force);
 		Packet_free(&vup->header);
 		return 0;
 	}
@@ -175,6 +164,7 @@ int tcp_packet_handler(int tcp_socket_desc, char* buf_rec, char* buf_send, Image
 	//Error case
 	else{
 		printf("%s...Unknown packet type id %d.\n", TCP, id);
+		communicate = 0;
 		return -1;
 	}
 }
@@ -192,10 +182,6 @@ void* client_thread_handler(void* args){
 	user->texture = NULL;
 	user->id = client_desc;
 	user->vehicle = NULL;
-	user->x_shift = 0;
-	user->y_shift = 0;
-	user->prev_x = -1;
-	user->prev_y = -1;
 	clientList_add(users, user);
 	printf("%s...User added successfully.\n", TCP);
 	clientList_print(users);
@@ -261,6 +247,7 @@ void* client_thread_handler(void* args){
 	Vehicle_destroy(delete);
 	Image_free(canc->texture);
 	free(canc);
+	World_update(&world);
 	printf("%s... User %d removed from list.\n", TCP, elem->id);
 	clientList_print(users);
 
@@ -275,7 +262,8 @@ void* udp_handler(void* args){
 	char buf_rec[BUFFERSIZE], buf_send[BUFFERSIZE];
 	int ret = 0, msg_len = 0;
 	socklen_t addrlen;
-
+	
+	printf("%s... Initializing UDP connection.\n", UDP);
 	//socket udp
 	socket_udp = socket(AF_INET, SOCK_DGRAM, 0);
 	ERROR_HELPER(ret, "Error in udp socket creation.\n");

@@ -193,9 +193,9 @@ void* receive_UDP(void* args) {
 
 			    if(!in){
             Image* im = lw->vehicles[i]->texture;
-				    World_detachVehicle(&world, lw->vehicles[i]);
+			Vehicle* delete = World_detachVehicle(&world, lw->vehicles[i]);
             if (im != NULL) Image_free(im);
-            Vehicle_destroy(lw->vehicles[i]);
+            Vehicle_destroy(delete);
             World_update(&world);
             lw->has_vehicle[i] = -1;
             lw->ids[i] = -1;
