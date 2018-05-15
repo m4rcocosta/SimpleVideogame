@@ -6,36 +6,6 @@
 
 #include "utils.h"
 
-
-//Has user
-int hasUser(int ids[], int size, int id) {
-  for (int i = 0; i < size; i++) {
-    if (ids[i] == id) {
-      return i;
-    }
-  }
-  return -1;
-}
-
-//Add user
-int addUser(int ids[], int size, int id2, int* position, int* users_online) {
-  if (*users_online == WORLDSIZE) {
-    *position = -1;
-    return -1;
-  }
-  int ret = hasUser(ids, WORLDSIZE, id2);
-  if (ret != -1) return ret;
-  for (int i = 0; i < size; i++) {
-    if (ids[i] == -1) {
-      ids[i] = id2;
-      *users_online += 1;
-      *position = i;
-      break;
-    }
-  }
-  return -1;
-}
-
 // Get ID
 int get_ID(int socket) {
   char buf_send[BUFFERSIZE];

@@ -20,25 +20,12 @@ typedef struct udp_args{
     Image* vehicle_texture;
 }udp_args;
 
-typedef struct localWorld {
-  int ids[WORLDSIZE];
-  int users_online;
-  char has_vehicle[WORLDSIZE];
-  Vehicle** vehicles;
-} localWorld;
-
 typedef struct client_args {
-  localWorld* local_world;
   struct sockaddr_in server_addr_udp;
   int socket_udp;
   int socket_tcp;
+  int id;
 } client_args;
-
-//Has user
-int hasUser(int ids[], int size, int id);
-
-//Add user
-int addUser(int ids[], int size, int id2, int* position, int* users_online);
 
 // Get ID
 int get_ID(int socket);

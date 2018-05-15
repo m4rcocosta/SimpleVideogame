@@ -30,23 +30,10 @@ int ret, id, socket_tcp, socket_udp;
 struct sockaddr_in server_addr_tcp = {0}, server_addr_udp = {0};
 char connected = 1;
 Image *map_elevation, *map_texture, *my_texture;
-localWorld* local_world;
 
 // Clean resources
 void clean_resources(void) {
   printf("%sCleaning up...\n", CLIENT);
-  for (int i = 0; i < WORLDSIZE; i++) {
-    if (local_world->ids[i] == -1) continue;
-    if (i == 0) continue;
-    local_world->users_online--;
-    Image* im = local_world->vehicles[i]->texture;
-    World_detachVehicle(&world, local_world->vehicles[i]);
-    if (im != NULL) Image_free(im);
-    Vehicle_destroy(local_world->vehicles[i]);
-  }
-  free(local_world->vehicles);
-  free(local_world);
-  printf("%slocal_world released.\n", CLIENT);
   ret = close(socket_tcp);
   ERROR_HELPER(ret, "Error while closing TCP socket.\n");
   printf("%ssocket_tcp closed.\n", CLIENT);
@@ -100,7 +87,7 @@ int send_updates(int socket_udp, struct sockaddr_in server_addr, int serverlengt
   vup->id = id;
   int size = Packet_serialize(buf_send, &vup->header);
   int bytes_sent = sendto(socket_udp, buf_send, size, 0, (const struct sockaddr*)&server_addr, (socklen_t)serverlength);
-  printf("%sSent a VehicleUpdatePacket of %d bytes with tf:%f rf:%f \n", CLIENT, bytes_sent, vup->translational_force, vup->rotational_force);
+  //if(DEBUG) printf("%sSent a VehicleUpdatePacket of %d bytes with tf:%f rf:%f \n", CLIENT, bytes_sent, vup->translational_force, vup->rotational_force);
   Packet_free(&(vup->header));
   if (bytes_sent < 0) return -1;
   return 0;
@@ -120,13 +107,24 @@ void* send_UDP(void* args) {
   pthread_exit(NULL);
 }
 
+void* getter(void* args){
+  client_args udp_args = *(client_args*)args;
+
+	// Add user
+	if(DEBUG)printf("%sAdding user with id %d.\n", CLIENT, udp_args.id);
+  Vehicle* toAdd = (Vehicle*) malloc(sizeof(Vehicle));
+	Image* texture_vehicle = get_Vehicle_Texture(udp_args.socket_tcp , udp_args.id);	
+	Vehicle_init(toAdd, &world, udp_args.id, texture_vehicle);	
+	World_addVehicle(&world, toAdd);
+	pthread_exit(NULL);
+}
+
 // Receive and apply WorldUpdatePacket from server
 void* receive_UDP(void* args) {
   client_args udp_args = *(client_args*)args;
   struct sockaddr_in server_addr = udp_args.server_addr_udp;
   int socket_udp = udp_args.socket_udp;
   socklen_t addrlen = sizeof(server_addr);
-  localWorld* lw = udp_args.local_world;
   int socket_tcp = udp_args.socket_tcp;
   while (connected) {
     char receive_buffer[BUFFERSIZE];
@@ -140,68 +138,58 @@ void* receive_UDP(void* args) {
       usleep(500000);
       continue;
     }
-    printf("%sReceived %d bytes from UDP.\n", CLIENT, bytes_read);
+    //if(DEBUG) printf("%sReceived %d bytes from UDP.\n", CLIENT, bytes_read);
     PacketHeader* ph = (PacketHeader*) receive_buffer;
     if(ph->size != bytes_read) ERROR_HELPER(-1, "Error: partial UDP read!\n");
     if(ph->type == WorldUpdate) {
+      client_args* udp_args;
       WorldUpdatePacket* wup = (WorldUpdatePacket*) Packet_deserialize(receive_buffer, bytes_read);
       for(int i = 0; i < wup->num_vehicles; i++) {
-        int new_position = -1;
-        int id_struct = addUser(lw->ids,WORLDSIZE,wup->updates[i].id, &new_position, &(lw->users_online));
-        if(wup->updates[i].id == id) continue;
-        else if(id_struct == -1) {
-          if(new_position == -1) continue;
-          Image* img = get_Vehicle_Texture(socket_tcp, wup->updates[i].id);
-          if(img == NULL) continue;
-          Vehicle* new_vehicle = (Vehicle*)malloc(sizeof(vehicle));
-          Vehicle_init(new_vehicle, &world, wup->updates[i].id, img);
-          lw->vehicles[new_position] = new_vehicle;
+		  	Vehicle* v = World_getVehicle(&world, wup->updates[i].id);
+		  	if(v == vehicle) continue; //Current client's vehicle
+		  	if(v == NULL){ // Vehicle doesn't exist, add
+			  	pthread_t get;
+				  udp_args = (client_args*) malloc(sizeof(client_args));
+				  udp_args->id = wup->updates[i].id;
+			  	udp_args->socket_tcp = socket_tcp;
+			  	ret = pthread_create(&get, NULL, getter, (void*) udp_args);
+			  	PTHREAD_ERROR_HELPER(ret, "Error while creating get thread.\n");
+				
+			  	ret = pthread_join(get, NULL);
+				  PTHREAD_ERROR_HELPER(ret, "Error in join on get thread.\n");
+				
+			  }
+			  else{
+			  	// Vehicle exists, update 
+			  	v->theta 	= wup->updates[i].theta;
+			  	v->x 			= wup->updates[i].x;
+			  	v->y 			= wup->updates[i].y;
+			  }
+		  }
 
-          // Set Forces Update
-          lw->vehicles[new_position]->translational_force = wup->updates[i].translational_force;
-          lw->vehicles[new_position]->rotational_force = wup->updates[i].rotational_force;
-          // Set X, Y, Theta
-          lw->vehicles[new_position]->x = wup->updates[i].x;
-          lw->vehicles[new_position]->y = wup->updates[i].y;
-          lw->vehicles[new_position]->theta = wup->updates[i].theta;
-
-          World_addVehicle(&world, new_vehicle);
-          World_update(&world);
-          lw->has_vehicle[new_position] = 1;
-        }
-        else {
-          printf("%sUpdating Vehicle with id %d.\n", CLIENT, wup->updates[i].id);
-
-          // Set X, Y, Theta
-          lw->vehicles[id_struct]->x = wup->updates[i].x;
-          lw->vehicles[id_struct]->y = wup->updates[i].y;
-          lw->vehicles[id_struct]->theta = wup->updates[i].theta;
-          // Set Forces Update
-          lw->vehicles[id_struct]->translational_force = wup->updates[i].translational_force;
-          lw->vehicles[id_struct]->rotational_force = wup->updates[i].rotational_force;
-          World_update(&world);
-
-        }
-        for(int i = 0; i < WORLDSIZE; i++){
-			    int in = 0;
-          if (lw->ids[i] == -1) continue;
-			    for(int j = 0; j < wup->num_vehicles && !in; j++){
-				    if(lw->ids[i] == wup->updates[j].id){
-					    in = 1;
-				    }
-			    }
-
-			    if(!in){
-            Image* im = lw->vehicles[i]->texture;
-			Vehicle* delete = World_detachVehicle(&world, lw->vehicles[i]);
-            if (im != NULL) Image_free(im);
-            Vehicle_destroy(delete);
-            World_update(&world);
-            lw->has_vehicle[i] = -1;
-            lw->ids[i] = -1;
-            lw->users_online --;
-			    }
-		    }
+      if(world.vehicles.size == wup->num_vehicles) {
+		   	Packet_free(&wup->header);
+	    }
+      else {
+        Vehicle* current = (Vehicle*) world.vehicles.first;
+        for(int i = 0; i < world.vehicles.size; i++){
+			    int in = 0, forward = 0;
+	        for(int j = 0; j < wup->num_vehicles && !in; j++){
+	    		  if(current->id == wup->updates[j].id){
+	    			  in = 1;
+	    		  }
+	    		}
+			
+	    		if(!in){
+	    		  if(DEBUG)printf("%sDelete Vehicle %d.\n", CLIENT, current->id);
+	    		  Vehicle* toDelete = World_detachVehicle(&world, current);
+		    	  current = (Vehicle*) current->list.next;
+		    	  forward = 1;
+		    	  free(toDelete);
+		    	}
+			
+		    	if(!forward) current = (Vehicle*) current->list.next;	
+	    	}
       }
     }
     else {
@@ -255,18 +243,9 @@ int main(int argc, char **argv) {
 
   printf("%sTCP connection established...\n", CLIENT);
 
-  // Setting up localWorld
-  local_world = (localWorld*)malloc(sizeof(localWorld));
-  local_world->vehicles = (Vehicle**)malloc(sizeof(Vehicle*) * WORLDSIZE);
-  for (int i = 0; i < WORLDSIZE; i++) {
-    local_world->ids[i] = -1;
-    local_world->has_vehicle[i] = 0;
-  }
-
   // Communicating with server
   printf("%sStarting ID,map_elevation,map_texture requests.\n", CLIENT);
   id = get_ID(socket_tcp);
-  local_world->ids[0] = id;
   printf("%sID number %d received.\n", TCP, id);
   map_elevation = get_Elevation_Map(socket_tcp, id);
   printf("%sMap elevation received.\n", TCP);
@@ -281,8 +260,6 @@ int main(int argc, char **argv) {
   vehicle = (Vehicle*)malloc(sizeof(Vehicle));
   Vehicle_init(vehicle, &world, id, my_texture);
   World_addVehicle(&world, vehicle);
-  local_world->vehicles[0] = vehicle;
-  local_world->has_vehicle[0] = 1;
   printf("%sWorld ready!\n", CLIENT);
 
   // UDP socket
@@ -300,7 +277,6 @@ int main(int argc, char **argv) {
   udp_args.socket_tcp = socket_tcp;
   udp_args.server_addr_udp = server_addr_udp;
   udp_args.socket_udp = socket_udp;
-  udp_args.local_world = local_world;
   ret = pthread_create(&sender_udp, NULL, send_UDP, &udp_args);
   PTHREAD_ERROR_HELPER(ret, "[CLIENT] Error while creating thread sender_udp.\n");
   printf("%sThread sender_udp created.\n", CLIENT);
