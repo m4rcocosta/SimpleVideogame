@@ -9,6 +9,7 @@ int Packet_serialize(char* dest, const PacketHeader* h){
   switch(h->type){
     case GetId:
     case GetTexture:
+    case GetVehicleTexture:
     case GetElevation:
     {
       const IdPacket* id_packet=(IdPacket*) h;
@@ -62,6 +63,7 @@ PacketHeader* Packet_deserialize(const char* buffer, int size){
   switch(h->type) {
     case GetId:
     case GetTexture:
+    case GetVehicleTexture:
     case GetElevation:
     {
       IdPacket* id_packet=(IdPacket*) malloc(sizeof(IdPacket));
@@ -107,6 +109,7 @@ void Packet_free(PacketHeader* h) {
   switch(h->type){
   case GetId:
   case GetTexture:
+  case GetVehicleTexture:
   case GetElevation:
   case VehicleUpdate:
   {

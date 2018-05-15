@@ -161,6 +161,26 @@ int tcp_packet_handler(int tcp_socket_desc, char* buf_rec, char* buf_send, Image
 
 		return 0;
 	}
+	else if(header->type == GetVehicleTexture) {
+		printf("%s... Received GetVehicleTexture request from %d user.\n", TCP, id);
+		ImagePacket* imp = (ImagePacket*)Packet_deserialize(buf_rec, header->size);
+		ImagePacket image_packet;
+		PacketHeader ph;
+		id = imp->id;
+
+		printf("%s...Searching %d user vehicle texture.\n", TCP, id);
+		pthread_mutex_lock(&sem_user);
+
+		Vehicle* v = World_getVehicle(&world, id);
+		ph.type = PostTexture;
+		image_packet.header = ph;
+		image_packet.id = id;
+		image_packet.image = v->texture;
+		packet_len = Packet_serialize(buf_send, &(image_packet.header));
+
+		pthread_mutex_unlock(&sem_user);
+		return packet_len;
+	}
 	//Error case
 	else{
 		printf("%s...Unknown packet type id %d.\n", TCP, id);

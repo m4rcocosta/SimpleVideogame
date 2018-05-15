@@ -11,7 +11,6 @@
 #define TCP_PORT				2048
 #define UDP_PORT                2081
 #define BUFFERSIZE              1000000
-#define WORLDSIZE               512
 #define LOCALHOST            "127.0.0.1"
 #define VEHICLE              "./images/arrow-right.ppm"
 #define MAP_ELEVATION        "./images/maze.ppm"
@@ -22,7 +21,7 @@
 #define CLIENT  "[CLIENT] "
 #define TCP		"[TCP] "
 #define UDP		"[UDP] "
-#define DEBUG     1
+#define DEBUG     0
 
 //Macro for error handling
 #define GENERIC_ERROR_HELPER(cond, errCode, msg) do {               \

@@ -87,7 +87,7 @@ int send_updates(int socket_udp, struct sockaddr_in server_addr, int serverlengt
   vup->id = id;
   int size = Packet_serialize(buf_send, &vup->header);
   int bytes_sent = sendto(socket_udp, buf_send, size, 0, (const struct sockaddr*)&server_addr, (socklen_t)serverlength);
-  //if(DEBUG) printf("%sSent a VehicleUpdatePacket of %d bytes with tf:%f rf:%f \n", CLIENT, bytes_sent, vup->translational_force, vup->rotational_force);
+  if(DEBUG) printf("%sSent a VehicleUpdatePacket of %d bytes with tf:%f rf:%f \n", CLIENT, bytes_sent, vup->translational_force, vup->rotational_force);
   Packet_free(&(vup->header));
   if (bytes_sent < 0) return -1;
   return 0;
@@ -111,7 +111,7 @@ void* getter(void* args){
   client_args udp_args = *(client_args*)args;
 
 	// Add user
-	if(DEBUG)printf("%sAdding user with id %d.\n", CLIENT, udp_args.id);
+	printf("%sAdding user with id %d.\n", CLIENT, udp_args.id);
   Vehicle* toAdd = (Vehicle*) malloc(sizeof(Vehicle));
 	Image* texture_vehicle = get_Vehicle_Texture(udp_args.socket_tcp , udp_args.id);	
 	Vehicle_init(toAdd, &world, udp_args.id, texture_vehicle);	
@@ -138,7 +138,7 @@ void* receive_UDP(void* args) {
       usleep(500000);
       continue;
     }
-    //if(DEBUG) printf("%sReceived %d bytes from UDP.\n", CLIENT, bytes_read);
+    if(DEBUG) printf("%sReceived %d bytes from UDP.\n", CLIENT, bytes_read);
     PacketHeader* ph = (PacketHeader*) receive_buffer;
     if(ph->size != bytes_read) ERROR_HELPER(-1, "Error: partial UDP read!\n");
     if(ph->type == WorldUpdate) {
@@ -181,7 +181,7 @@ void* receive_UDP(void* args) {
 	    		}
 			
 	    		if(!in){
-	    		  if(DEBUG)printf("%sDelete Vehicle %d.\n", CLIENT, current->id);
+	    		  printf("%sDelete Vehicle %d.\n", CLIENT, current->id);
 	    		  Vehicle* toDelete = World_detachVehicle(&world, current);
 		    	  current = (Vehicle*) current->list.next;
 		    	  forward = 1;
