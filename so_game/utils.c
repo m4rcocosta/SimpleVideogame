@@ -46,7 +46,7 @@ int get_ID(int socket) {
     msg_len += ret;
   }
   IdPacket* deserialized_packet = (IdPacket*)Packet_deserialize(buf_rcv, msg_len + ph_len);
-  printf("[Get Id] Received %d bytes, id = %d \n", msg_len + ph_len, deserialized_packet->id);
+  if(DEBUG) printf("[Get Id] Received %d bytes, id = %d \n", msg_len + ph_len, deserialized_packet->id);
   int id = deserialized_packet->id;
   Packet_free(&(deserialized_packet->header));
   return id;
@@ -74,7 +74,7 @@ Image* get_Elevation_Map(int socket, int id) {
     bytes_sent += ret;
   }
 
-  printf("[Elevation request] Sent %d bytes.\n", bytes_sent);
+  if(DEBUG) printf("[Elevation request] Sent %d bytes.\n", bytes_sent);
   int msg_len = 0;
   int ph_len = sizeof(PacketHeader);
   while (msg_len < ph_len) {
@@ -95,7 +95,7 @@ Image* get_Elevation_Map(int socket, int id) {
   }
 
   ImagePacket* deserialized_packet = (ImagePacket*)Packet_deserialize(buf_rcv, msg_len + ph_len);
-  printf("[Elevation request] Received %d bytes \n", msg_len + ph_len);
+  if(DEBUG) printf("[Elevation request] Received %d bytes \n", msg_len + ph_len);
   Packet_free(&(request->header));
   Image* elevationMap = deserialized_packet->image;
   free(deserialized_packet);
@@ -122,7 +122,7 @@ Image* get_Texture_Map(int socket, int id) {
     if (ret == 0) break;
     bytes_sent += ret;
   }
-  printf("[Texture request] %d bytes sent.\n", bytes_sent);
+  if(DEBUG) printf("[Texture request] %d bytes sent.\n", bytes_sent);
   int msg_len = 0;
   int ph_len = sizeof(PacketHeader);
   while (msg_len < ph_len) {
@@ -133,7 +133,7 @@ Image* get_Texture_Map(int socket, int id) {
   }
   PacketHeader* incoming_pckt = (PacketHeader*)buf_rcv;
   size = incoming_pckt->size - ph_len;
-  printf("[Texture Request] Size to read: %d .\n", size);
+  if(DEBUG) printf("[Texture Request] Size to read: %d .\n", size);
   msg_len = 0;
   while (msg_len < size) {
     ret = recv(socket, buf_rcv + msg_len + ph_len, size - msg_len, 0);
@@ -143,7 +143,7 @@ Image* get_Texture_Map(int socket, int id) {
   }
   ImagePacket* deserialized_packet =
       (ImagePacket*)Packet_deserialize(buf_rcv, msg_len + ph_len);
-  printf("[Texture Request] %d bytes received.\n", msg_len + ph_len);
+  if(DEBUG) printf("[Texture Request] %d bytes received.\n", msg_len + ph_len);
   Packet_free(&(request->header));
   Image* textureMap = deserialized_packet->image;
   free(deserialized_packet);
@@ -171,7 +171,7 @@ int send_Vehicle_Texture(int socket, Image* texture, int id) {
     if (ret == 0) break;
     bytes_sent += ret;
   }
-  printf("[Vehicle texture] %d bytes sent.\n", bytes_sent);
+  if(DEBUG) printf("[Vehicle texture] %d bytes sent.\n", bytes_sent);
   return 0;
 }
 
@@ -223,7 +223,7 @@ Image* get_Vehicle_Texture(int socket, int id) {
   }
   ImagePacket* deserialized_packet =
       (ImagePacket*)Packet_deserialize(buf_rcv, msg_len + ph_len);
-  printf("[Get Vehicle Texture] Received %d bytes.\n", msg_len + ph_len);
+  if(DEBUG) printf("[Get Vehicle Texture] Received %d bytes.\n", msg_len + ph_len);
   Image* im = deserialized_packet->image;
   free(deserialized_packet);
   return im;

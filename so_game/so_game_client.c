@@ -33,19 +33,19 @@ Image *map_elevation, *map_texture, *my_texture;
 
 // Clean resources
 void clean_resources(void) {
-  printf("%sCleaning up...\n", CLIENT);
+  if(DEBUG) printf("%sCleaning up...\n", CLIENT);
   ret = close(socket_tcp);
   ERROR_HELPER(ret, "Error while closing TCP socket.\n");
-  printf("%ssocket_tcp closed.\n", CLIENT);
+  if(DEBUG) printf("%ssocket_tcp closed.\n", CLIENT);
   ret = close(socket_udp);
   ERROR_HELPER(ret, "Error while closing UDP socket.\n");
-  printf("%ssocket_udp closed.\n", CLIENT);
+  if(DEBUG) printf("%ssocket_udp closed.\n", CLIENT);
   World_destroy(&world);
-  printf("%sworld released\n", CLIENT);
+  if(DEBUG) printf("%sworld released\n", CLIENT);
   if(map_elevation == NULL) Image_free(map_elevation);
   if(map_elevation == NULL) Image_free(map_texture);
   if(map_elevation == NULL) Image_free(my_texture);
-  printf("%smap_elevation, map_texture, my_texture released\n", CLIENT);
+  if(DEBUG) printf("%smap_elevation, map_texture, my_texture released\n", CLIENT);
   return;
 }
 
@@ -57,8 +57,8 @@ void handle_signal(int signal) {
     case SIGQUIT:
     case SIGTERM:
     case SIGINT:
+      printf("%sClosing client.\n", CLIENT);
       connected = 0;
-      sleep(1);
       clean_resources();
       exit(0);
     default:
@@ -181,7 +181,7 @@ void* receive_UDP(void* args) {
 	    		}
 			
 	    		if(!in){
-	    		  printf("%sDelete Vehicle %d.\n", CLIENT, current->id);
+	    		  printf("%sDeleting user with id %d.\n", CLIENT, current->id);
 	    		  Vehicle* toDelete = World_detachVehicle(&world, current);
 		    	  current = (Vehicle*) current->list.next;
 		    	  forward = 1;
@@ -191,6 +191,12 @@ void* receive_UDP(void* args) {
 		    	if(!forward) current = (Vehicle*) current->list.next;	
 	    	}
       }
+    }
+    else if(ph->type == PostDisconnect) {
+      printf("%sServer disconnected... Closing client.\n", CLIENT);
+      connected = 0;
+      clean_resources();
+      exit(0);
     }
     else {
       printf("%sError: received unknown packet.\n", CLIENT);
@@ -209,7 +215,7 @@ int main(int argc, char **argv) {
     exit(-1);
   }
 
-  printf("%sLoading texture image from %s ... ", CLIENT, argv[2]);
+  printf("%sLoading texture image from %s ...\n", CLIENT, argv[2]);
   my_texture = Image_load(argv[2]);
   if (my_texture) {
     printf("Done! \n");
@@ -227,6 +233,10 @@ int main(int argc, char **argv) {
   sigfillset(&sa.sa_mask);
   ret = sigaction(SIGHUP, &sa, NULL);
   ERROR_HELPER(ret, "Error: cannot handle SIGHUP.\n");
+  ret = sigaction(SIGQUIT, &sa, NULL);
+  ERROR_HELPER(ret, "Error: cannot handle SIGQUIT.\n");
+  ret = sigaction(SIGTERM, &sa, NULL);
+  ERROR_HELPER(ret, "Error: cannot handle SIGTERM.\n");
   ret = sigaction(SIGINT, &sa, NULL);
   ERROR_HELPER(ret, "Error: cannot handle SIGINT.\n");
 
@@ -241,31 +251,31 @@ int main(int argc, char **argv) {
   ret = connect(socket_tcp, (struct sockaddr*) &server_addr_tcp, sizeof(struct sockaddr_in));
   ERROR_HELPER(ret, "Error while connecting on socket_tcp");
 
-  printf("%sTCP connection established...\n", CLIENT);
+  if(DEBUG) printf("%sTCP connection established...\n", CLIENT);
 
   // Communicating with server
-  printf("%sStarting ID,map_elevation,map_texture requests.\n", CLIENT);
+  if(DEBUG) printf("%sStarting ID,map_elevation,map_texture requests.\n", CLIENT);
   id = get_ID(socket_tcp);
-  printf("%sID number %d received.\n", TCP, id);
+  if(DEBUG) printf("%sID number %d received.\n", TCP, id);
   map_elevation = get_Elevation_Map(socket_tcp, id);
-  printf("%sMap elevation received.\n", TCP);
+  if(DEBUG) printf("%sMap elevation received.\n", TCP);
   map_texture = get_Texture_Map(socket_tcp, id);
-  printf("%sMap texture received.\n", TCP);
-  printf("%sSending vehicle texture...\n", CLIENT);
+  if(DEBUG) printf("%sMap texture received.\n", TCP);
+  if(DEBUG) printf("%sSending vehicle texture...\n", CLIENT);
   send_Vehicle_Texture(socket_tcp, my_texture, id);
-  printf("%sClient Vehicle texture sent.\n", TCP);
+  if(DEBUG) printf("%sClient Vehicle texture sent.\n", TCP);
 
   // construct the world
   World_init(&world, map_elevation, map_texture, 0.5, 0.5, 0.5);
   vehicle = (Vehicle*)malloc(sizeof(Vehicle));
   Vehicle_init(vehicle, &world, id, my_texture);
   World_addVehicle(&world, vehicle);
-  printf("%sWorld ready!\n", CLIENT);
+  if(DEBUG) printf("%sWorld ready!\n", CLIENT);
 
   // UDP socket
   socket_udp = socket(AF_INET, SOCK_DGRAM, 0);
   ERROR_HELPER(socket_udp, "Error while creating socket_udp.\n");
-  printf("%sUDP socket created...\n", CLIENT);
+  if(DEBUG) printf("%sUDP socket created...\n", CLIENT);
 
   server_addr_udp.sin_addr.s_addr = inet_addr(argv[1]);
   server_addr_udp.sin_family = AF_INET;
@@ -279,16 +289,16 @@ int main(int argc, char **argv) {
   udp_args.socket_udp = socket_udp;
   ret = pthread_create(&sender_udp, NULL, send_UDP, &udp_args);
   PTHREAD_ERROR_HELPER(ret, "[CLIENT] Error while creating thread sender_udp.\n");
-  printf("%sThread sender_udp created.\n", CLIENT);
+  if(DEBUG) printf("%sThread sender_udp created.\n", CLIENT);
   ret = pthread_create(&receiver_udp, NULL, receive_UDP, &udp_args);
   PTHREAD_ERROR_HELPER(ret, "[CLIENT] Error while creating thread receiver_udp.\n");
-  printf("%sThread receiveer_udp created.\n", CLIENT);
+  if(DEBUG) printf("%sThread receiveer_udp created.\n", CLIENT);
 
   // Run
   WorldViewer_runGlobal(&world, vehicle, &argc, argv);
 
   // Waiting threads to end and cleaning resources
-  printf("%sDisabling and joining on UDP and TCP threads.\n", CLIENT);
+  if(DEBUG) printf("%sDisabling and joining on UDP and TCP threads.\n", CLIENT);
   connected = 0;
   ret = pthread_join(sender_udp, NULL);
   PTHREAD_ERROR_HELPER(ret, "Error pthread_join on thread UDP_sender.\n");
