@@ -43,7 +43,6 @@ void clean_resources(void) {
   if(DEBUG) printf("%s...surface_elevation, surface_texture, vehicle_texture released\n", SERVER);
   exit(EXIT_SUCCESS);
 }
-
 //Signal handler
 void handler(int signal){
 	switch(signal){
@@ -208,7 +207,8 @@ void* client_thread_handler(void* args){
 	pthread_mutex_unlock(&sem_user);
 
 	int ret, bytes_read, msg_len;
-	char buf_recv[BUFFERSIZE], buf_send[BUFFERSIZE];
+	char* buf_recv = (char*) malloc(BUFFERSIZE * sizeof(char));
+	char* buf_send = (char*) malloc(BUFFERSIZE * sizeof(char));
 	size_t ph_len = sizeof(PacketHeader);
 
 	while(communicate){
@@ -245,6 +245,8 @@ void* client_thread_handler(void* args){
 		}
 		if(DEBUG) printf("%s... Operation success! Continue...\n\n", TCP);
 	}
+	free(buf_recv);
+	free(buf_send);
 
 	//if we exit from the while cicle, we have to deallocate and close
 	printf("%s...User %d disconnected.\n", TCP, client_desc);
@@ -279,7 +281,8 @@ void* client_thread_handler(void* args){
 void* udp_handler(void* args){
 	struct sockaddr_in client_addr;
 	int id = *(int*) args;
-	char buf_rec[BUFFERSIZE], buf_send[BUFFERSIZE];
+	char* buf_rec = (char*) malloc(BUFFERSIZE * sizeof(char));
+	char* buf_send = (char*) malloc(BUFFERSIZE * sizeof(char));
 	int ret = 0, msg_len = 0;
 	socklen_t addrlen;
 	
@@ -347,21 +350,8 @@ void* udp_handler(void* args){
 		//Free resources
 		Packet_free(&wup->header);
 	}
-
-
-		
-		
-		
-		
-	IdPacket* idp = (IdPacket*)malloc(sizeof(IdPacket));
-	PacketHeader ph;
-	ph.type = PostDisconnect;
-	idp->header = ph;
-	addrlen = sizeof(struct sockaddr);
-	msg_len = Packet_serialize(buf_send, &(idp->header));
-	ret = sendto(socket_udp, buf_send, msg_len, 0, (struct sockaddr*)&client_addr, addrlen);
-	if(ret == -1) printf("Error while sending disconnection.\n");
-	Packet_free(&idp->header);
+	free(buf_rec);
+	free(buf_send);
 	close(socket_udp);
 	printf("%s...UDP communication with id %d terminated. Success!\n", UDP, id);
 	pthread_exit(NULL);
@@ -415,103 +405,103 @@ int main(int argc, char **argv) {
     exit(-1);
 	}
 	char* elevation_filename=argv[1];
-  char* texture_filename=argv[2];
+  	char* texture_filename=argv[2];
 
-  char* vehicle_texture_filename = VEHICLE;
-  printf("%sLoading elevation image from %s ...\n", SERVER, elevation_filename);
+  	char* vehicle_texture_filename = VEHICLE;
+  	printf("%sLoading elevation image from %s ...\n", SERVER, elevation_filename);
 
-  // load the images
-  surface_elevation = Image_load(elevation_filename);
-  if (surface_elevation) {
-    printf("Done! \n");
-  } else {
-    printf("Fail! \n");
-  }
+  	// load the images
+  	surface_elevation = Image_load(elevation_filename);
+  	if (surface_elevation) {
+    	printf("Done! \n");
+  	} else {
+    	printf("Fail! \n");
+  	}
 
 
-  printf("%sLoading texture image from %s ...\n", SERVER, texture_filename);
-  surface_texture = Image_load(texture_filename);
-  if (surface_texture) {
-    printf("Done! \n");
-  } else {
-    printf("Fail! \n");
-  }
+  	printf("%sLoading texture image from %s ...\n", SERVER, texture_filename);
+  	surface_texture = Image_load(texture_filename);
+  	if (surface_texture) {
+    	printf("Done! \n");
+  	} else {
+    	printf("Fail! \n");
+  	}
 
-  printf("%sLoading vehicle texture (default) from %s ...\n", SERVER, vehicle_texture_filename);
-  vehicle_texture = Image_load(vehicle_texture_filename);
-  if (vehicle_texture) {
-    printf("Done! \n");
-  } else {
-    printf("Fail! \n");
-  }
+  	printf("%sLoading vehicle texture (default) from %s ...\n", SERVER, vehicle_texture_filename);
+  	vehicle_texture = Image_load(vehicle_texture_filename);
+  	if (vehicle_texture) {
+    	printf("Done! \n");
+  	} else {
+    	printf("Fail! \n");
+  	}
 
-  //TCP socket
-  if(DEBUG) printf("%s... initializing TCP\n", SERVER);
-  if(DEBUG) printf("%s...Socket TCP creation\n", SERVER);
+  	//TCP socket
+  	if(DEBUG) printf("%s... initializing TCP\n", SERVER);
+	if(DEBUG) printf("%s...Socket TCP creation\n", SERVER);
 
-  //socket for TCP communication
-  socket_tcp = socket(AF_INET, SOCK_STREAM, 0);
-  ERROR_HELPER(socket_tcp, "Error in socket creation\n");
+	//socket for TCP communication
+	socket_tcp = socket(AF_INET, SOCK_STREAM, 0);
+	ERROR_HELPER(socket_tcp, "Error in socket creation\n");
 
-  if(DEBUG) printf("%sServer TCP Port: %d\n", SERVER, TCP_PORT);
+	if(DEBUG) printf("%sServer TCP Port: %d\n", SERVER, TCP_PORT);
 
-  struct sockaddr_in server_addr_tcp = {0};
-  server_addr_tcp.sin_family			= AF_INET;
-  server_addr_tcp.sin_port				= htons(TCP_PORT);
-  server_addr_tcp.sin_addr.s_addr	= INADDR_ANY;
+	struct sockaddr_in server_addr_tcp = {0};
+	server_addr_tcp.sin_family			= AF_INET;
+	server_addr_tcp.sin_port				= htons(TCP_PORT);
+	server_addr_tcp.sin_addr.s_addr	= INADDR_ANY;
 
-  int reuseaddr_opt = 1;		//recover a server in case of a crash
-  int ret;
-  ret = setsockopt(socket_tcp, SOL_SOCKET, SO_REUSEADDR, &reuseaddr_opt, sizeof(reuseaddr_opt));
-  ERROR_HELPER(ret, "Failed setsockopt() on server socket_tcp");
+	int reuseaddr_opt = 1;		//recover a server in case of a crash
+	int ret;
+	ret = setsockopt(socket_tcp, SOL_SOCKET, SO_REUSEADDR, &reuseaddr_opt, sizeof(reuseaddr_opt));
+	ERROR_HELPER(ret, "Failed setsockopt() on server socket_tcp");
 
-  //binding
-  ret = bind(socket_tcp, (struct sockaddr*) &server_addr_tcp, sizeof(server_addr_tcp));
-  ERROR_HELPER(ret, "Error in binding\n");
+	//binding
+	ret = bind(socket_tcp, (struct sockaddr*) &server_addr_tcp, sizeof(server_addr_tcp));
+	ERROR_HELPER(ret, "Error in binding\n");
 
-  if(DEBUG) printf("%s... TCP socket created\n", SERVER);
+	if(DEBUG) printf("%s... TCP socket created\n", SERVER);
 
-  //initializing users list
-  users = malloc(sizeof(ClientList));
-  clientList_init(users);
-  if(DEBUG) printf("%s... users list initialized\n", SERVER);
+	//initializing users list
+	users = malloc(sizeof(ClientList));
+	clientList_init(users);
+	if(DEBUG) printf("%s... users list initialized\n", SERVER);
 
-  //signal handlers
-  struct sigaction sa;
-  sa.sa_handler = handler;
-  sa.sa_flags = SA_RESTART;
+	//signal handlers
+	struct sigaction sa;
+	sa.sa_handler = handler;
+	sa.sa_flags = SA_RESTART;
 
-  //every signal is blocked during the handler
-  sigfillset(&sa.sa_mask);
-  ret=sigaction(SIGHUP, &sa, NULL);
-  ERROR_HELPER(ret,"Error: cannot handle SIGHUP");
-  ret=sigaction(SIGINT, &sa, NULL);
-  ERROR_HELPER(ret,"Error: cannot handle SIGINT");
+	//every signal is blocked during the handler
+	sigfillset(&sa.sa_mask);
+	ret=sigaction(SIGHUP, &sa, NULL);
+	ERROR_HELPER(ret,"Error: cannot handle SIGHUP");
+	ret=sigaction(SIGINT, &sa, NULL);
+	ERROR_HELPER(ret,"Error: cannot handle SIGINT");
 
-  //listen to a max of 8 connections
-  ret = listen(socket_tcp, 8);
-  ERROR_HELPER(ret, "Error in listen\n");
+	//listen to a max of 8 connections
+	ret = listen(socket_tcp, 8);
+	ERROR_HELPER(ret, "Error in listen\n");
 
-  if(DEBUG) printf("%s...Server started.\n", SERVER);
+	if(DEBUG) printf("%s...Server started.\n", SERVER);
 
-  World_init(&world, surface_elevation, surface_texture,  0.5, 0.5, 0.5);
+	World_init(&world, surface_elevation, surface_texture,  0.5, 0.5, 0.5);
 
-  tcp_args tcp_arg;
-  tcp_arg.elevation_texture = surface_texture;
-  tcp_arg.surface_elevation = surface_elevation;
+	tcp_args tcp_arg;
+	tcp_arg.elevation_texture = surface_texture;
+	tcp_arg.surface_elevation = surface_elevation;
 
-  //create threads for udp and tcp communication
-  pthread_t tcp_connect;
+	//create threads for udp and tcp communication
+	pthread_t tcp_connect;
 
-  ret = pthread_create(&tcp_connect, NULL, thread_server_tcp, &tcp_arg);
-  PTHREAD_ERROR_HELPER(ret, "Error in spawning tcp thread.\n");
+	ret = pthread_create(&tcp_connect, NULL, thread_server_tcp, &tcp_arg);
+	PTHREAD_ERROR_HELPER(ret, "Error in spawning tcp thread.\n");
 
-  printf("%sWaiting for client's connection.\n", SERVER);
+	printf("%sWaiting for client's connection.\n", SERVER);
 
-  ret = pthread_join(tcp_connect, NULL);
-  PTHREAD_ERROR_HELPER(ret, "Error in join tcp thread.\n");
+	ret = pthread_join(tcp_connect, NULL);
+	PTHREAD_ERROR_HELPER(ret, "Error in join tcp thread.\n");
 
-  if(DEBUG) printf("%s...Freeing resources.\n", SERVER);
+	if(DEBUG) printf("%s...Freeing resources.\n", SERVER);
 
-  clean_resources();
+	clean_resources();
 }

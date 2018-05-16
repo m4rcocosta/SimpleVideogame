@@ -69,7 +69,7 @@ void handle_signal(int signal) {
 
 // Send Vehicle Updates
 int send_updates(int socket_udp, struct sockaddr_in server_addr, int serverlength) {
-  char buf_send[BUFFERSIZE];
+  char* buf_send = (char*) malloc(BUFFERSIZE * sizeof(char));
   PacketHeader ph;
   ph.type = VehicleUpdate;
   VehicleUpdatePacket* vup = (VehicleUpdatePacket*)malloc(sizeof(VehicleUpdatePacket));
@@ -89,6 +89,7 @@ int send_updates(int socket_udp, struct sockaddr_in server_addr, int serverlengt
   int bytes_sent = sendto(socket_udp, buf_send, size, 0, (const struct sockaddr*)&server_addr, (socklen_t)serverlength);
   if(DEBUG) printf("%sSent a VehicleUpdatePacket of %d bytes with tf:%f rf:%f \n", CLIENT, bytes_sent, vup->translational_force, vup->rotational_force);
   Packet_free(&(vup->header));
+  free(buf_send);
   if (bytes_sent < 0) return -1;
   return 0;
 }
@@ -126,8 +127,8 @@ void* receive_UDP(void* args) {
   int socket_udp = udp_args.socket_udp;
   socklen_t addrlen = sizeof(server_addr);
   int socket_tcp = udp_args.socket_tcp;
+  char* receive_buffer = (char*) malloc(BUFFERSIZE * sizeof(char));
   while (connected) {
-    char receive_buffer[BUFFERSIZE];
     int bytes_read = recvfrom(socket_udp, receive_buffer, BUFFERSIZE, 0, (struct sockaddr*)&server_addr, &addrlen);
     if(bytes_read == -1) {
       printf("%sError while receiving from UDP.\n", CLIENT);
@@ -192,19 +193,13 @@ void* receive_UDP(void* args) {
 	    	}
       }
     }
-    else if(ph->type == PostDisconnect) {
-      printf("%sServer disconnected... Closing client.\n", CLIENT);
-      connected = 0;
-      clean_resources();
-      exit(0);
-    }
     else {
       printf("%sError: received unknown packet.\n", CLIENT);
       connected = 0;
       exit(-1);
     }
   }
-
+  free(receive_buffer);
   pthread_exit(NULL);
 }
 
@@ -287,6 +282,7 @@ int main(int argc, char **argv) {
   udp_args.socket_tcp = socket_tcp;
   udp_args.server_addr_udp = server_addr_udp;
   udp_args.socket_udp = socket_udp;
+  udp_args.id = id;
   ret = pthread_create(&sender_udp, NULL, send_UDP, &udp_args);
   PTHREAD_ERROR_HELPER(ret, "[CLIENT] Error while creating thread sender_udp.\n");
   if(DEBUG) printf("%sThread sender_udp created.\n", CLIENT);

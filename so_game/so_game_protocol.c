@@ -11,7 +11,6 @@ int Packet_serialize(char* dest, const PacketHeader* h){
     case GetTexture:
     case GetVehicleTexture:
     case GetElevation:
-    case PostDisconnect:
     {
       const IdPacket* id_packet=(IdPacket*) h;
       memcpy(dest, id_packet, sizeof(IdPacket));
@@ -66,7 +65,6 @@ PacketHeader* Packet_deserialize(const char* buffer, int size){
     case GetTexture:
     case GetVehicleTexture:
     case GetElevation:
-    case PostDisconnect:
     {
       IdPacket* id_packet=(IdPacket*) malloc(sizeof(IdPacket));
       memcpy(id_packet, buffer, sizeof(IdPacket));
@@ -114,7 +112,6 @@ void Packet_free(PacketHeader* h) {
   case GetVehicleTexture:
   case GetElevation:
   case VehicleUpdate:
-  case PostDisconnect:
   {
     free(h);
     return;
