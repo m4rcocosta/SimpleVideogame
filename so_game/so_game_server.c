@@ -154,7 +154,6 @@ int tcp_packet_handler(int tcp_socket_desc, char* buf_rec, char* buf_send, Image
 		if(elem == NULL) return -1;
 
 		elem->vehicle = vehicle;
-		elem->texture = imp->image;
 		elem->vehicle->texture = imp->image;
 
 		pthread_mutex_unlock(&sem_user);
@@ -197,13 +196,12 @@ void* client_thread_handler(void* args){
 	int client_desc = arg->client_desc;
 
 	pthread_mutex_lock(&sem_user);
-	printf("%s...Adding user with id %d.\n", TCP, client_desc);
+	printf("%s...Adding user with id %d.\n", SERVER, client_desc);
 	ClientListElement* user = (ClientListElement*)malloc(sizeof(ClientListElement));
-	user->texture = NULL;
 	user->id = client_desc;
 	user->vehicle = NULL;
 	clientList_add(users, user);
-	printf("%s...User added successfully.\n", TCP);
+	printf("%s...User added successfully.\n", SERVER);
 	clientList_print(users);
 	pthread_mutex_unlock(&sem_user);
 
@@ -250,8 +248,7 @@ void* client_thread_handler(void* args){
 	free(buf_send);
 
 	//if we exit from the while cicle, we have to deallocate and close
-	printf("%s...User %d disconnected.\n", TCP, client_desc);
-	printf("%s...Closing.\n", TCP);
+	printf("%s...User %d disconnected.\n", SERVER, client_desc);
 
 	pthread_mutex_lock(&sem_user);
 	ClientListElement* elem = clientList_find(users, client_desc);
@@ -268,10 +265,9 @@ void* client_thread_handler(void* args){
 	}
 	Vehicle* delete = World_detachVehicle(&world, canc->vehicle);
 	Vehicle_destroy(delete);
-	Image_free(canc->texture);
 	free(canc);
 	World_update(&world);
-	printf("%s... User %d removed from list.\n", TCP, elem->id);
+	printf("%s... User %d removed from list.\n", SERVER, elem->id);
 	clientList_print(users);
 
 	pthread_mutex_unlock(&sem_user);

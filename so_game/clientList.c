@@ -68,11 +68,14 @@ void clientList_print(ClientList* users) {
   printf("List elements: [");
   while (i < users->size) {
     if (user != NULL) {
-      printf("%d,", user->id);
+      if(i == 0) {
+        printf("%d", user->id);
+      }
+      else printf(",%d", user->id);
       user = user->next;
       i++;
-    } else
-      break;
+    }
+    else break;
   }
   printf("]\n");
 }

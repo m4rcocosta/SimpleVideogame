@@ -5,11 +5,7 @@
 typedef struct ClientListElement {
   struct ClientListElement* next;
   int id;
-  float x, y, theta;
-  struct sockaddr_in user_addr;
   Vehicle* vehicle;
-  Image* texture;
-  float rotational_force, translational_force;
 } ClientListElement;
 
 typedef struct ClientList{
