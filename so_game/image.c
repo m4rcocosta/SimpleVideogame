@@ -7,6 +7,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include "common.h"
+
 static const int MAX_SIZE=1024*1024;
   
 void Image_free(Image* img) {
@@ -133,12 +135,12 @@ Image* Image_deserialize(const char* buffer, int size) {
       return 0;
     buffer+=char_read;
     size-=char_read;
-    printf("read");
+    if(DEBUG) printf("read");
   } while(line[0]=='#');
 
   sscanf(line, "%d %d\n", &cols, &rows);
-  printf("rows:%d, cols: %d\n", rows, cols);
-  printf("magic number: [%s]\n", magic_number);
+  if(DEBUG) printf("rows:%d, cols: %d\n", rows, cols);
+  if(DEBUG) printf("magic number: [%s]\n", magic_number);
 
   int maxval;
   char_read=getLine(line, buffer, size);

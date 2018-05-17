@@ -41,11 +41,11 @@ void clean_resources(void) {
   ERROR_HELPER(ret, "Error while closing TCP socket.\n");
   if(DEBUG) printf("%ssocket_tcp closed.\n", CLIENT);
   World_destroy(&world);
-  if(DEBUG) printf("%sworld released\n", CLIENT);
+  if(DEBUG) printf("%sworld released,\n", CLIENT);
   Image_free(map_elevation);
   Image_free(map_texture);
   Image_free(my_texture);
-  if(DEBUG) printf("%smap_elevation, map_texture, my_texture released\n", CLIENT);
+  if(DEBUG) printf("%smap_elevation, map_texture, my_texture released.\n", CLIENT);
   exit(0);
 }
 
@@ -102,8 +102,7 @@ void* send_UDP(void* args) {
   int server_length = sizeof(server_addr);
   while (connected) {
     int ret = send_updates(socket_udp, server_addr, server_length);
-    if (ret == -1)
-      printf("%sCannot send VehicleUpdatePacket.\n", CLIENT);
+    if (ret == -1) printf("%sCannot send VehicleUpdatePacket.\n", CLIENT);
   }
   pthread_exit(NULL);
 }
@@ -113,7 +112,7 @@ void* getter(void* args){
   client_args udp_args = *(client_args*)args;
 
 	// Add user
-	printf("%sAdding user with id %d.\n", CLIENT, udp_args.id);
+	printf("%sUser with id %d connected.\n", CLIENT, udp_args.id);
   Vehicle* toAdd = (Vehicle*) malloc(sizeof(Vehicle));
 	Image* texture_vehicle = get_Vehicle_Texture(udp_args.socket_tcp , udp_args.id);	
 	Vehicle_init(toAdd, &world, udp_args.id, texture_vehicle);	
@@ -149,7 +148,8 @@ void* receive_UDP(void* args) {
       for(int i = 0; i < wup->num_vehicles; i++) {
 		  	Vehicle* v = World_getVehicle(&world, wup->updates[i].id);
 		  	if(v == vehicle) continue; //Current client's vehicle
-		  	if(v == NULL){ // Vehicle doesn't exist, add
+		  	// Vehicle doesn't exist, add
+        if(v == NULL){
 			  	pthread_t get;
 				  udp_args = (client_args*) malloc(sizeof(client_args));
 				  udp_args->id = wup->updates[i].id;
@@ -161,17 +161,16 @@ void* receive_UDP(void* args) {
 				  PTHREAD_ERROR_HELPER(ret, "Error in join on get thread.\n");
 				
 			  }
+			  // Vehicle exists, update 
 			  else{
-			  	// Vehicle exists, update 
+			  	v->x = wup->updates[i].x;
+			  	v->y = wup->updates[i].y;
 			  	v->theta 	= wup->updates[i].theta;
-			  	v->x 			= wup->updates[i].x;
-			  	v->y 			= wup->updates[i].y;
 			  }
 		  }
-
-      if(world.vehicles.size == wup->num_vehicles) {
-		   	Packet_free(&wup->header);
-	    }
+      // If there aren't disconnected vehicles
+      if(world.vehicles.size == wup->num_vehicles) Packet_free(&wup->header);
+      // Delete disconnected vehicles
       else {
         Vehicle* current = (Vehicle*) world.vehicles.first;
         for(int i = 0; i < world.vehicles.size; i++){
@@ -218,14 +217,14 @@ int main(int argc, char **argv) {
     exit(-1);
   }
 
-  printf("%sLoading texture image from %s ...\n", CLIENT, argv[2]);
+  if(DEBUG) printf("%sLoading texture image from %s ...\n", CLIENT, argv[2]);
   my_texture = Image_load(argv[2]);
   if (my_texture) {
-    printf("Done! \n");
+    if(DEBUG) printf("Done! \n");
   } else {
-    printf("Fail! \n");
+    if(DEBUG) printf("Fail! \n");
   }
-  printf("%sStarting... \n", CLIENT);
+  if(DEBUG) printf("%sStarting... \n", CLIENT);
 
   // Signal handlers
   struct sigaction sa;
