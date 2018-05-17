@@ -27,7 +27,7 @@ Image *surface_elevation, *surface_texture, *vehicle_texture;
 int socket_tcp, socket_desc_tcp;		//network variables
 World world;
 
-
+// Clean used resources when server is closed
 void clean_resources(void) {
   if(DEBUG) printf("%s...Cleaning up...\n", SERVER);
   pthread_mutex_destroy(&sem_user);

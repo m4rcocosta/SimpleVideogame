@@ -31,7 +31,7 @@ struct sockaddr_in server_addr_tcp = {0}, server_addr_udp = {0};
 char connected = 1;
 Image *map_elevation, *map_texture, *my_texture;
 
-// Clean resources
+// Clean used resources when client is closed
 void clean_resources(void) {
   if(DEBUG) printf("%sCleaning up...\n", CLIENT);
   ret = close(socket_udp);
@@ -108,6 +108,7 @@ void* send_UDP(void* args) {
   pthread_exit(NULL);
 }
 
+// Add new users
 void* getter(void* args){
   client_args udp_args = *(client_args*)args;
 
