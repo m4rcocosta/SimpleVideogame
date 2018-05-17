@@ -42,11 +42,11 @@ void clean_resources(void) {
   if(DEBUG) printf("%ssocket_tcp closed.\n", CLIENT);
   World_destroy(&world);
   if(DEBUG) printf("%sworld released\n", CLIENT);
-  if(map_elevation == NULL) Image_free(map_elevation);
-  if(map_elevation == NULL) Image_free(map_texture);
-  if(map_elevation == NULL) Image_free(my_texture);
+  Image_free(map_elevation);
+  Image_free(map_texture);
+  Image_free(my_texture);
   if(DEBUG) printf("%smap_elevation, map_texture, my_texture released\n", CLIENT);
-  return;
+  exit(0);
 }
 
 // Handle Signal
@@ -61,7 +61,6 @@ void handle_signal(int signal) {
       connected = 0;
       sleep(1);
       clean_resources();
-      exit(0);
     default:
       fprintf(stderr, "Caught wrong signal: %d\n", signal);
       return;
@@ -192,7 +191,14 @@ void* receive_UDP(void* args) {
 			
 		    	if(!forward) current = (Vehicle*) current->list.next;	
 	    	}
+        Packet_free(&wup->header);
       }
+    }
+    else if(ph->type == PostDisconnect) {
+      printf("%sServer disconnected... Exit!\n", CLIENT);     
+      connected = 0;
+      sleep(1);
+      clean_resources();
     }
     else {
       printf("%sError: received unknown packet.\n", CLIENT);
@@ -294,13 +300,9 @@ int main(int argc, char **argv) {
   // Run
   WorldViewer_runGlobal(&world, vehicle, &argc, argv);
 
-  // Waiting threads to end and cleaning resources
-  if(DEBUG) printf("%sDisabling and joining on UDP and TCP threads.\n", CLIENT);
-  connected = 0;
-  ret = pthread_join(sender_udp, NULL);
-  PTHREAD_ERROR_HELPER(ret, "Error pthread_join on thread UDP_sender.\n");
-  ret = pthread_join(receiver_udp, NULL);
-  PTHREAD_ERROR_HELPER(ret, "Error pthread_join on thread UDP_receiver.\n");
-  clean_resources();
+  ret = pthread_detach(sender_udp);
+  PTHREAD_ERROR_HELPER(ret, "Error pthread_detach on thread UDP_sender.\n");
+  ret = pthread_detach(receiver_udp);
+  PTHREAD_ERROR_HELPER(ret, "Error pthread_detach on thread UDP_receiver.\n");
   return 0;
 }

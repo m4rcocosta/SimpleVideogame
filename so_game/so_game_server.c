@@ -20,11 +20,11 @@
 #include "clientList.h"
 #include "so_game_protocol.h"
 
-int accepted = 1, communicate = 1;
+int accepted = 1, communicate = 1, disconnecting = 0;
 ClientList* users;
 pthread_mutex_t sem_user = PTHREAD_MUTEX_INITIALIZER;
 Image *surface_elevation, *surface_texture, *vehicle_texture;
-int socket_tcp, socket_udp, socket_desc_tcp;		//network variables
+int socket_tcp, socket_desc_tcp;		//network variables
 World world;
 
 
@@ -49,8 +49,9 @@ void handler(int signal){
   case SIGHUP:
     break;
   case SIGINT:
+	disconnecting = 1;
     communicate = 0;
-    printf("%s...Closing server after a %d signal...\n", SERVER, signal);
+    printf("%s...Closing server after a SIGINT signal...\n", SERVER);
 	sleep(1);
     clean_resources();
   default:
@@ -285,7 +286,7 @@ void* udp_handler(void* args){
 	
 	if(DEBUG) printf("%s... Initializing UDP connection.\n", UDP);
 	//socket udp
-	socket_udp = socket(AF_INET, SOCK_DGRAM, 0);
+	int socket_udp = socket(AF_INET, SOCK_DGRAM, 0);
 	ERROR_HELPER(ret, "Error in udp socket creation.\n");
 
 	//Reusable socket in case of crash
@@ -347,10 +348,23 @@ void* udp_handler(void* args){
 		//Free resources
 		Packet_free(&wup->header);
 	}
+	if(disconnecting == 1) {
+		printf("%sClosing server... Sending disconnection to client with id %d.\n", SERVER, id);
+		IdPacket* idp = (IdPacket*) malloc(sizeof(IdPacket));
+		PacketHeader ph;
+		ph.type = PostDisconnect;
+		idp->header = ph;
+		idp->id = id;
+		msg_len = Packet_serialize(buf_send, &(idp->header));
+		ret = sendto(socket_udp, buf_send, msg_len, 0, (struct sockaddr*)&client_addr, sizeof(struct sockaddr));
+		if(ret == -1) printf("%sError while sending disconnection to %d.\n", SERVER, id);
+		if(DEBUG) printf("%sDisconnection sent to %d.\n", SERVER, id);
+		Packet_free(&idp->header);
+	}
 	free(buf_rec);
 	free(buf_send);
 	close(socket_udp);
-	printf("%s...UDP communication with id %d terminated. Success!\n", UDP, id);
+	if(DEBUG) printf("%s...UDP communication with id %d terminated. Success!\n", UDP, id);
 	pthread_exit(NULL);
 }
 
