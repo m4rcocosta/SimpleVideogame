@@ -51,6 +51,7 @@ void handler(int signal){
   case SIGINT:
     communicate = 0;
     printf("%s...Closing server after a %d signal...\n", SERVER, signal);
+	sleep(1);
     clean_resources();
   default:
     fprintf(stderr, "Caught wrong signal: %d\n", signal);
@@ -366,9 +367,7 @@ void* thread_server_tcp(void* args){
 	while(accepted){
 		struct sockaddr_in client_addr;
 		socklen_t cli_addr_size = sizeof(client_addr);
-		int socket_desc_tcp = accept(socket_tcp,
-                                 (struct sockaddr*) &client_addr,
-                                 &cli_addr_size);
+		int socket_desc_tcp = accept(socket_tcp, (struct sockaddr*) &client_addr, &cli_addr_size);
 		ERROR_HELPER(socket_desc_tcp, "Error in accept tcp connection.\n");
 
 		//client thread args
@@ -391,9 +390,7 @@ void* thread_server_tcp(void* args){
 
 		ret = pthread_detach(udp_handler_thread);	//we don't wait for this thread, detach
 		PTHREAD_ERROR_HELPER(ret, "Error in detach UDP receiver thread\n");
-
 	}
-
 	pthread_exit(NULL);
 }
 
@@ -401,13 +398,14 @@ void* thread_server_tcp(void* args){
 int main(int argc, char **argv) {
 
 	if (argc<3) {
-	printf("Used: %s %s %s\nUsage: ./so_game_server <elevation_image> <texture_image>\n", argv[0], argv[1], argv[1]==NULL?NULL:argv[2]);
-    exit(-1);
+		printf("Used: %s %s %s\nUsage: ./so_game_server <elevation_image> <texture_image>\n", argv[0], argv[1], argv[1]==NULL?NULL:argv[2]);
+    	exit(-1);
 	}
+
 	char* elevation_filename=argv[1];
   	char* texture_filename=argv[2];
-
   	char* vehicle_texture_filename = VEHICLE;
+
   	printf("%sLoading elevation image from %s ...\n", SERVER, elevation_filename);
 
   	// load the images

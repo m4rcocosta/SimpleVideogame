@@ -34,12 +34,12 @@ Image *map_elevation, *map_texture, *my_texture;
 // Clean resources
 void clean_resources(void) {
   if(DEBUG) printf("%sCleaning up...\n", CLIENT);
-  ret = close(socket_tcp);
-  ERROR_HELPER(ret, "Error while closing TCP socket.\n");
-  if(DEBUG) printf("%ssocket_tcp closed.\n", CLIENT);
   ret = close(socket_udp);
   ERROR_HELPER(ret, "Error while closing UDP socket.\n");
   if(DEBUG) printf("%ssocket_udp closed.\n", CLIENT);
+  ret = close(socket_tcp);
+  ERROR_HELPER(ret, "Error while closing TCP socket.\n");
+  if(DEBUG) printf("%ssocket_tcp closed.\n", CLIENT);
   World_destroy(&world);
   if(DEBUG) printf("%sworld released\n", CLIENT);
   if(map_elevation == NULL) Image_free(map_elevation);
@@ -59,6 +59,7 @@ void handle_signal(int signal) {
     case SIGINT:
       printf("%sClosing client.\n", CLIENT);
       connected = 0;
+      sleep(1);
       clean_resources();
       exit(0);
     default:
@@ -288,7 +289,7 @@ int main(int argc, char **argv) {
   if(DEBUG) printf("%sThread sender_udp created.\n", CLIENT);
   ret = pthread_create(&receiver_udp, NULL, receive_UDP, &udp_args);
   PTHREAD_ERROR_HELPER(ret, "[CLIENT] Error while creating thread receiver_udp.\n");
-  if(DEBUG) printf("%sThread receiveer_udp created.\n", CLIENT);
+  if(DEBUG) printf("%sThread receiver_udp created.\n", CLIENT);
 
   // Run
   WorldViewer_runGlobal(&world, vehicle, &argc, argv);
