@@ -51,7 +51,7 @@ void handler(int signal){
   case SIGINT:
 	disconnecting = 1;
     communicate = 0;
-    printf("%sClosing server after a SIGINT signal...\n", SERVER);
+    printf("%sClosing server%s...\n", SERVER, DEBUG?" after a SIGINT signal":"");
 	sleep(1);
     clean_resources();
   default:
@@ -346,7 +346,7 @@ void* udp_handler(void* args){
 		Packet_free(&wup->header);
 	}
 	if(disconnecting == 1) {
-		printf("%sClosing server... Sending disconnection to client with id %d.\n", SERVER, id);
+		printf("%sSending disconnection to client with id %d...\n", SERVER, id);
 		IdPacket* idp = (IdPacket*) malloc(sizeof(IdPacket));
 		PacketHeader ph;
 		ph.type = PostDisconnect;
