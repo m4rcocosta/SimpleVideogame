@@ -8,8 +8,8 @@
 
 // Get ID
 int get_ID(int socket) {
-  char buf_send[BUFFERSIZE];
-  char buf_rcv[BUFFERSIZE];
+  char* buf_send = (char*) malloc(BUFFERSIZE * sizeof(char));;
+  char* buf_recv = (char*) malloc(BUFFERSIZE * sizeof(char));;
   IdPacket* request = (IdPacket*)malloc(sizeof(IdPacket));
   PacketHeader ph;
   ph.type = GetId;
@@ -30,32 +30,34 @@ int get_ID(int socket) {
   int ph_len = sizeof(PacketHeader);
   int msg_len = 0;
   while (msg_len < ph_len) {
-    ret = recv(socket, buf_rcv + msg_len, ph_len - msg_len, 0);
+    ret = recv(socket, buf_recv + msg_len, ph_len - msg_len, 0);
     if (ret == -1 && errno == EINTR) continue;
     ERROR_HELPER(msg_len, "Cannot read from socket.\n");
     msg_len += ret;
   }
-  PacketHeader* header = (PacketHeader*)buf_rcv;
+  PacketHeader* header = (PacketHeader*)buf_recv;
   size = header->size - ph_len;
 
   msg_len = 0;
   while (msg_len < size) {
-    ret = recv(socket, buf_rcv + msg_len + ph_len, size - msg_len, 0);
+    ret = recv(socket, buf_recv + msg_len + ph_len, size - msg_len, 0);
     if (ret == -1 && errno == EINTR) continue;
     ERROR_HELPER(msg_len, "Cannot read from socket.\n");
     msg_len += ret;
   }
-  IdPacket* deserialized_packet = (IdPacket*)Packet_deserialize(buf_rcv, msg_len + ph_len);
+  IdPacket* deserialized_packet = (IdPacket*)Packet_deserialize(buf_recv, msg_len + ph_len);
   if(DEBUG) printf("[Get Id] Received %d bytes, id = %d \n", msg_len + ph_len, deserialized_packet->id);
   int id = deserialized_packet->id;
+  free(buf_send);
+  free(buf_recv);
   Packet_free(&(deserialized_packet->header));
   return id;
 }
 
 // Get Elevation Map
 Image* get_Elevation_Map(int socket, int id) {
-  char buf_send[BUFFERSIZE];
-  char buf_rcv[BUFFERSIZE];
+  char* buf_send = (char*) malloc(BUFFERSIZE * sizeof(char));
+  char* buf_recv = (char*) malloc(BUFFERSIZE * sizeof(char));
   ImagePacket* request = (ImagePacket*)malloc(sizeof(ImagePacket));
   PacketHeader ph;
   ph.type = GetElevation;
@@ -78,34 +80,36 @@ Image* get_Elevation_Map(int socket, int id) {
   int msg_len = 0;
   int ph_len = sizeof(PacketHeader);
   while (msg_len < ph_len) {
-    ret = recv(socket, buf_rcv, ph_len, 0);
+    ret = recv(socket, buf_recv, ph_len, 0);
     if (ret == -1 && errno == EINTR) continue;
     ERROR_HELPER(ret, "Cannot read from socket.\n");
     msg_len += ret;
   }
 
-  PacketHeader* incoming_pckt = (PacketHeader*)buf_rcv;
+  PacketHeader* incoming_pckt = (PacketHeader*)buf_recv;
   size = incoming_pckt->size - ph_len;
   msg_len = 0;
   while (msg_len < size) {
-    ret = recv(socket, buf_rcv + msg_len + ph_len, size - msg_len, 0);
+    ret = recv(socket, buf_recv + msg_len + ph_len, size - msg_len, 0);
     if (ret == -1 && errno == EINTR) continue;
     ERROR_HELPER(ret, "Cannot read from socket.\n");
     msg_len += ret;
   }
 
-  ImagePacket* deserialized_packet = (ImagePacket*)Packet_deserialize(buf_rcv, msg_len + ph_len);
+  ImagePacket* deserialized_packet = (ImagePacket*)Packet_deserialize(buf_recv, msg_len + ph_len);
   if(DEBUG) printf("[Elevation request] Received %d bytes \n", msg_len + ph_len);
   Packet_free(&(request->header));
   Image* elevationMap = deserialized_packet->image;
+  free(buf_send);
+  free(buf_recv);
   free(deserialized_packet);
   return elevationMap;
 }
 
 // Get Texture Map
 Image* get_Texture_Map(int socket, int id) {
-  char buf_send[BUFFERSIZE];
-  char buf_rcv[BUFFERSIZE];
+  char* buf_send = (char*) malloc(BUFFERSIZE * sizeof(char));
+  char* buf_recv = (char*) malloc(BUFFERSIZE * sizeof(char));
   ImagePacket* request = (ImagePacket*)malloc(sizeof(ImagePacket));
   PacketHeader ph;
   ph.type = GetTexture;
@@ -126,33 +130,34 @@ Image* get_Texture_Map(int socket, int id) {
   int msg_len = 0;
   int ph_len = sizeof(PacketHeader);
   while (msg_len < ph_len) {
-    ret = recv(socket, buf_rcv, ph_len, 0);
+    ret = recv(socket, buf_recv, ph_len, 0);
     if (ret == -1 && errno == EINTR) continue;
     ERROR_HELPER(ret, "Cannot read from socket.\n");
     msg_len += ret;
   }
-  PacketHeader* incoming_pckt = (PacketHeader*)buf_rcv;
+  PacketHeader* incoming_pckt = (PacketHeader*)buf_recv;
   size = incoming_pckt->size - ph_len;
   if(DEBUG) printf("[Texture Request] Size to read: %d .\n", size);
   msg_len = 0;
   while (msg_len < size) {
-    ret = recv(socket, buf_rcv + msg_len + ph_len, size - msg_len, 0);
+    ret = recv(socket, buf_recv + msg_len + ph_len, size - msg_len, 0);
     if (ret == -1 && errno == EINTR) continue;
     ERROR_HELPER(ret, "Cannot read from socket.\n");
     msg_len += ret;
   }
-  ImagePacket* deserialized_packet =
-      (ImagePacket*)Packet_deserialize(buf_rcv, msg_len + ph_len);
+  ImagePacket* deserialized_packet = (ImagePacket*)Packet_deserialize(buf_recv, msg_len + ph_len);
   if(DEBUG) printf("[Texture Request] %d bytes received.\n", msg_len + ph_len);
   Packet_free(&(request->header));
   Image* textureMap = deserialized_packet->image;
+  free(buf_send);
+  free(buf_recv);
   free(deserialized_packet);
   return textureMap;
 }
 
 // Send Vehicle Texture
 int send_Vehicle_Texture(int socket, Image* texture, int id) {
-  char buf_send[BUFFERSIZE];
+  char* buf_send = (char*) malloc(BUFFERSIZE * sizeof(char));
   ImagePacket* request = (ImagePacket*)malloc(sizeof(ImagePacket));
   PacketHeader ph;
   ph.type = PostTexture;
@@ -172,13 +177,14 @@ int send_Vehicle_Texture(int socket, Image* texture, int id) {
     bytes_sent += ret;
   }
   if(DEBUG) printf("[Vehicle texture] %d bytes sent.\n", bytes_sent);
+  free(buf_send);
   return 0;
 }
 
 // Get Vehicle Texture
 Image* get_Vehicle_Texture(int socket, int id) {
-  char buf_send[BUFFERSIZE];
-  char buf_rcv[BUFFERSIZE];
+  char* buf_send = (char*) malloc(BUFFERSIZE * sizeof(char));
+  char* buf_recv = (char*) malloc(BUFFERSIZE * sizeof(char));
   ImagePacket* request = (ImagePacket*)malloc(sizeof(ImagePacket));
   PacketHeader ph;
   ph.type = GetVehicleTexture;
@@ -200,31 +206,25 @@ Image* get_Vehicle_Texture(int socket, int id) {
   int ph_len = sizeof(PacketHeader);
   int msg_len = 0;
   while (msg_len < ph_len) {
-    ret = recv(socket, buf_rcv + msg_len, ph_len - msg_len, 0);
+    ret = recv(socket, buf_recv + msg_len, ph_len - msg_len, 0);
     if (ret == -1 && errno == EINTR) continue;
     ERROR_HELPER(msg_len, "Cannot read from socket.\n");
     msg_len += ret;
   }
-  PacketHeader* header = (PacketHeader*)buf_rcv;
+  PacketHeader* header = (PacketHeader*)buf_recv;
   size = header->size - ph_len;
-  char flag = 0;
   msg_len = 0;
   while (msg_len < size) {
-    ret = recv(socket, buf_rcv + msg_len + ph_len, size - msg_len, 0);
+    ret = recv(socket, buf_recv + msg_len + ph_len, size - msg_len, 0);
     if (ret == -1 && errno == EINTR) continue;
     ERROR_HELPER(msg_len, "Cannot read from socket.\n");
     msg_len += ret;
   }
-
-  if (flag) {
-    IdPacket* packet = (IdPacket*)Packet_deserialize(buf_rcv, msg_len + ph_len);
-    Packet_free(&packet->header);
-    return NULL;
-  }
-  ImagePacket* deserialized_packet =
-      (ImagePacket*)Packet_deserialize(buf_rcv, msg_len + ph_len);
+  ImagePacket* deserialized_packet = (ImagePacket*)Packet_deserialize(buf_recv, msg_len + ph_len);
   if(DEBUG) printf("[Get Vehicle Texture] Received %d bytes.\n", msg_len + ph_len);
   Image* im = deserialized_packet->image;
+  free(buf_send);
+  free(buf_recv);
   free(deserialized_packet);
   return im;
 }
