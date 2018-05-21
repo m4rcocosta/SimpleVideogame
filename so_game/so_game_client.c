@@ -273,6 +273,7 @@ int main(int argc, char **argv) {
   Vehicle_init(vehicle, &world, id, my_texture);
   World_addVehicle(&world, vehicle);
   if(DEBUG) printf("%sWorld ready!\n", CLIENT);
+  printf("%sClient connected to the server.\n");
 
   // UDP socket
   socket_udp = socket(AF_INET, SOCK_DGRAM, 0);
