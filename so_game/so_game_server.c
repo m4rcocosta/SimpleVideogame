@@ -43,6 +43,7 @@ void clean_resources(void) {
   if(DEBUG) printf("%ssurface_elevation, surface_texture, vehicle_texture released.\n", SERVER);
   exit(EXIT_SUCCESS);
 }
+
 //Signal handler
 void handler(int signal){
 	switch(signal){
@@ -50,6 +51,7 @@ void handler(int signal){
     break;
   case SIGINT:
 	disconnecting = 1;
+	accepted = 0;
     communicate = 0;
     printf("%sClosing server%s...\n", SERVER, DEBUG?" after a SIGINT signal":"");
 	sleep(1);
@@ -89,7 +91,7 @@ int udp_packet_handler(int socket_udp, char* buf, struct sockaddr_in client_addr
 	else return -1;
 }
 
-//Manage various types of packets received from the TCP connection
+//Manage various types of packets received from TCP connection
 int tcp_packet_handler(int tcp_socket_desc, char* buf_rec, char* buf_send, Image* surface_elevation, Image* elevation_texture) {
 	PacketHeader* header = (PacketHeader*) buf_rec;
 	int packet_len;
@@ -273,6 +275,9 @@ void* client_thread_handler(void* args){
 	pthread_exit(NULL);
 }
 
+//Thread to manage UDP communication
+//sending and receiving packets
+//when server is shut down, send a packet to close every client
 void* udp_handler(void* args){
 	struct sockaddr_in client_addr;
 	int id = *(int*) args;
@@ -366,7 +371,7 @@ void* udp_handler(void* args){
 }
 
 //Function to accept clients TCP connection
-//Spawn a new thread for every client connected
+//Spawn two new threads for every client connected
 void* thread_server_tcp(void* args){
 	int ret;
 	tcp_args* tcp_arg = (tcp_args*) args;
