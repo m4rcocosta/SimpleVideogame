@@ -298,19 +298,20 @@ int main(int argc, char **argv) {
   udp_args.server_addr_udp = server_addr_udp;
   udp_args.socket_udp = socket_udp;
   udp_args.id = id;
+
   ret = pthread_create(&sender_udp, NULL, send_UDP, &udp_args);
   PTHREAD_ERROR_HELPER(ret, "[CLIENT] Error while creating thread sender_udp.\n");
   if(DEBUG) printf("%sThread sender_udp created.\n", CLIENT);
+  ret = pthread_detach(sender_udp);
+  PTHREAD_ERROR_HELPER(ret, "Error pthread_detach on thread UDP_sender.\n");
+
   ret = pthread_create(&receiver_udp, NULL, receive_UDP, &udp_args);
   PTHREAD_ERROR_HELPER(ret, "[CLIENT] Error while creating thread receiver_udp.\n");
   if(DEBUG) printf("%sThread receiver_udp created.\n", CLIENT);
+  ret = pthread_detach(receiver_udp);
+  PTHREAD_ERROR_HELPER(ret, "Error pthread_detach on thread UDP_receiver.\n");
 
   // Run
   WorldViewer_runGlobal(&world, vehicle, &argc, argv);
-
-  ret = pthread_detach(sender_udp);
-  PTHREAD_ERROR_HELPER(ret, "Error pthread_detach on thread UDP_sender.\n");
-  ret = pthread_detach(receiver_udp);
-  PTHREAD_ERROR_HELPER(ret, "Error pthread_detach on thread UDP_receiver.\n");
   return 0;
 }
