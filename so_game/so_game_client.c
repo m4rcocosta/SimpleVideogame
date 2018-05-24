@@ -61,6 +61,11 @@ void handle_signal(int signal) {
       connected = 0;
       sleep(1);
       clean_resources();
+    case SIGSEGV:
+      printf("%sSegmentation fault... Closing client.\n", CLIENT);
+      connected = 0;
+      sleep(1);
+      clean_resources();      
     default:
       fprintf(stderr, "Caught wrong signal: %d\n", signal);
       return;
@@ -241,6 +246,8 @@ int main(int argc, char **argv) {
   ERROR_HELPER(ret, "Error: cannot handle SIGTERM.\n");
   ret = sigaction(SIGINT, &sa, NULL);
   ERROR_HELPER(ret, "Error: cannot handle SIGINT.\n");
+  ret = sigaction(SIGSEGV, &sa, NULL);
+  ERROR_HELPER(ret, "Error: cannot handle SIGSEGV.\n");
 
   // TCP socket
   socket_tcp = socket(AF_INET, SOCK_STREAM, 0);

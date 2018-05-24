@@ -50,10 +50,19 @@ void handler(int signal){
   case SIGHUP:
     break;
   case SIGINT:
+  case SIGQUIT:
+  case SIGTERM:
 	disconnecting = 1;
 	accepted = 0;
     communicate = 0;
     printf("%sClosing server%s...\n", SERVER, DEBUG?" after a SIGINT signal":"");
+	sleep(1);
+    clean_resources();
+  case SIGSEGV:
+	disconnecting = 1;
+	accepted = 0;
+    communicate = 0;
+    printf("%sSegmentation fault... Closing server...\n", SERVER);
 	sleep(1);
     clean_resources();
   default:
@@ -474,6 +483,12 @@ int main(int argc, char **argv) {
 	ERROR_HELPER(ret,"Error: cannot handle SIGHUP");
 	ret=sigaction(SIGINT, &sa, NULL);
 	ERROR_HELPER(ret,"Error: cannot handle SIGINT");
+ 	ret = sigaction(SIGQUIT, &sa, NULL);
+  	ERROR_HELPER(ret, "Error: cannot handle SIGQUIT.\n");
+  	ret = sigaction(SIGTERM, &sa, NULL);
+  	ERROR_HELPER(ret, "Error: cannot handle SIGTERM.\n");
+	ret=sigaction(SIGSEGV, &sa, NULL);
+	ERROR_HELPER(ret,"Error: cannot handle SIGSEGV");
 
 	//listen to a max of 8 connections
 	ret = listen(socket_tcp, 8);
