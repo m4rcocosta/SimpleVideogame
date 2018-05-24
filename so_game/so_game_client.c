@@ -26,7 +26,7 @@ WorldViewer viewer;
 World world;
 Vehicle* vehicle; // The vehicle
 
-int ret, id, socket_tcp, socket_udp;
+int ret, id = 0, socket_tcp, socket_udp;
 struct sockaddr_in server_addr_tcp = {0}, server_addr_udp = {0};
 char connected = 1;
 Image *map_elevation, *map_texture, *my_texture;
@@ -257,12 +257,12 @@ int main(int argc, char **argv) {
 
   // Communicating with server
   if(DEBUG) printf("%sStarting ID,map_elevation,map_texture requests.\n", CLIENT);
-  id = get_ID(socket_tcp);
-  if(DEBUG) printf("%sID number %d received.\n", TCP, id);
   map_elevation = get_Elevation_Map(socket_tcp, id);
   if(DEBUG) printf("%sMap elevation received.\n", TCP);
   map_texture = get_Texture_Map(socket_tcp, id);
   if(DEBUG) printf("%sMap texture received.\n", TCP);
+  id = get_ID(socket_tcp);
+  if(DEBUG) printf("%sID number %d received.\n", TCP, id);
   if(DEBUG) printf("%sSending vehicle texture...\n", CLIENT);
   send_Vehicle_Texture(socket_tcp, my_texture, id);
   if(DEBUG) printf("%sClient Vehicle texture sent.\n", TCP);

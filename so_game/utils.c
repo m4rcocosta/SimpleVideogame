@@ -187,7 +187,7 @@ Image* get_Vehicle_Texture(int socket, int id) {
   char* buf_recv = (char*) malloc(BUFFERSIZE * sizeof(char));
   ImagePacket* request = (ImagePacket*)malloc(sizeof(ImagePacket));
   PacketHeader ph;
-  ph.type = GetVehicleTexture;
+  ph.type = GetTexture;
   request->header = ph;
   request->id = id;
   int size = Packet_serialize(buf_send, &(request->header));
